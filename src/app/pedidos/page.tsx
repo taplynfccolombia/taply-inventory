@@ -3,8 +3,8 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { PRODUCT_CONFIG } from '@/lib/supabase'
-import { formatCOP, formatDateTime } from '@/lib/utils'
-import { Package, ChevronRight } from 'lucide-react'
+import { formatCOP, formatDateTime, generateWhatsAppLink, whatsAppPedidoMessage } from '@/lib/utils'
+import { Package, ChevronRight, MessageCircle } from 'lucide-react'
 
 interface Order {
   id: string
@@ -51,10 +51,7 @@ export default function PedidosPage() {
 
   async function updateOrderStatus(orderId: string, newStatus: string) {
     setUpdatingId(orderId)
-    const { error } = await supabase
-      .from('sales')
-      .update({ order_status: newStatus })
-      .eq('id', orderId)
+    const { error } = await supabase.from('sales').update({ order_status: newStatus }).eq('id', orderId)
     if (error) { setMessage({ type: 'error', text: 'Error al actualizar el estado.' }) }
     else { setMessage({ type: 'success', text: 'Estado actualizado correctamente.' }); fetchOrders() }
     setUpdatingId(null)
@@ -63,14 +60,12 @@ export default function PedidosPage() {
   async function advanceStatus(order: Order) {
     const currentIdx = getStepIndex(order.order_status)
     if (currentIdx < ORDER_STEPS.length - 1) {
-      await updateOrderStatus(order.id, ORDER_STEPS[currentIdx + 1].key)
+      const nextStatus = ORDER_STEPS[currentIdx + 1].key
+      await updateOrderStatus(order.id, nextStatus)
     }
   }
 
-  const filtered = filterStatus === 'todos'
-    ? orders
-    : orders.filter(o => o.order_status === filterStatus)
-
+  const filtered = filterStatus === 'todos' ? orders : orders.filter(o => o.order_status === filterStatus)
   const countByStatus = ORDER_STEPS.reduce((acc, step) => {
     acc[step.key] = orders.filter(o => o.order_status === step.key).length
     return acc
@@ -87,19 +82,16 @@ export default function PedidosPage() {
         </p>
       </div>
 
-      {/* Pipeline de estados */}
+      {/* Pipeline */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '12px' }}>
         {ORDER_STEPS.map((step, i) => (
-          <div key={step.key}
-            style={{ borderRadius: '14px', padding: '16px', backgroundColor: step.bg, border: `1px solid ${step.border}`, position: 'relative' }}>
+          <div key={step.key} style={{ borderRadius: '14px', padding: '16px', backgroundColor: step.bg, border: `1px solid ${step.border}`, position: 'relative' }}>
             {i < ORDER_STEPS.length - 1 && (
               <ChevronRight size={16} style={{ position: 'absolute', right: '-10px', top: '50%', transform: 'translateY(-50%)', color: '#2a2a2a', zIndex: 1 }} />
             )}
             <div style={{ fontSize: '20px', marginBottom: '8px' }}>{step.emoji}</div>
             <p style={{ margin: 0, fontSize: '13px', fontWeight: 700, color: step.color }}>{step.label}</p>
-            <p style={{ margin: '4px 0 0', fontSize: '24px', fontWeight: 900, color: '#f0f0f0' }}>
-              {countByStatus[step.key] ?? 0}
-            </p>
+            <p style={{ margin: '4px 0 0', fontSize: '24px', fontWeight: 900, color: '#f0f0f0' }}>{countByStatus[step.key] ?? 0}</p>
           </div>
         ))}
       </div>
@@ -134,7 +126,7 @@ export default function PedidosPage() {
         ))}
       </div>
 
-      {/* Lista de pedidos */}
+      {/* Lista */}
       {loading ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           {[...Array(3)].map((_, i) => (
@@ -144,9 +136,7 @@ export default function PedidosPage() {
       ) : filtered.length === 0 ? (
         <div style={{ borderRadius: '16px', padding: '48px', textAlign: 'center', backgroundColor: '#161616', border: '1px solid #1f1f1f' }}>
           <Package size={32} style={{ margin: '0 auto 12px', display: 'block', color: '#374151' }} />
-          <p style={{ margin: 0, color: '#4b5563', fontSize: '14px' }}>
-            {filterStatus === 'todos' ? 'No hay pedidos registrados.' : `No hay pedidos en estado "${ORDER_STEPS.find(s => s.key === filterStatus)?.label}".`}
-          </p>
+          <p style={{ margin: 0, color: '#4b5563', fontSize: '14px' }}>No hay pedidos en este estado.</p>
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -156,31 +146,36 @@ export default function PedidosPage() {
             const nextStep = currentIdx < ORDER_STEPS.length - 1 ? ORDER_STEPS[currentIdx + 1] : null
             const isUpdating = updatingId === order.id
             const client = order.client as unknown as { full_name: string; phone: string | null } | null
+            const productLabel = PRODUCT_CONFIG[order.product_type].label
+
+            // Generar link WhatsApp para notificar cambio de estado
+            const whatsappLink = client?.phone
+              ? generateWhatsAppLink(
+                  client.phone,
+                  whatsAppPedidoMessage(client.full_name, productLabel, order.order_status)
+                )
+              : null
 
             return (
               <div key={order.id}
                 style={{ borderRadius: '14px', padding: '20px 24px', backgroundColor: '#161616', border: `1px solid ${currentStep.border}` }}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px' }}>
 
-                  {/* Info del pedido */}
+                  {/* Info */}
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-                      <span style={{ fontSize: '16px', fontWeight: 700, color: '#00cfff' }}>
-                        {PRODUCT_CONFIG[order.product_type].label}
-                      </span>
+                      <span style={{ fontSize: '16px', fontWeight: 700, color: '#00cfff' }}>{productLabel}</span>
                       <span style={{ fontSize: '13px', color: '#6b7280' }}>× {order.quantity}</span>
-                      <span style={{ fontSize: '13px', fontWeight: 600, color: '#00ff94' }}>
-                        {formatCOP(order.total_revenue)}
-                      </span>
+                      <span style={{ fontSize: '13px', fontWeight: 600, color: '#00ff94' }}>{formatCOP(order.total_revenue)}</span>
                     </div>
 
                     {client && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '6px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '6px', flexWrap: 'wrap' }}>
                         <span style={{ fontSize: '13px', color: '#f0f0f0' }}>👤 {client.full_name}</span>
-                        {client.phone && (
-                          <a href={`https://wa.me/57${client.phone.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer"
-                            style={{ fontSize: '12px', color: '#00cfff', textDecoration: 'none' }}>
-                            📱 WhatsApp
+                        {whatsappLink && (
+                          <a href={whatsappLink} target="_blank" rel="noopener noreferrer"
+                            style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: 600, textDecoration: 'none', backgroundColor: '#00ff940d', border: '1px solid #00ff9422', color: '#00ff94' }}>
+                            <MessageCircle size={11} /> Notificar por WhatsApp
                           </a>
                         )}
                       </div>
@@ -192,7 +187,7 @@ export default function PedidosPage() {
                     </div>
                   </div>
 
-                  {/* Estado actual + botón avanzar */}
+                  {/* Estado + botón avanzar */}
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '10px', flexShrink: 0 }}>
                     <span style={{ padding: '6px 14px', borderRadius: '999px', fontSize: '13px', fontWeight: 700,
                       backgroundColor: currentStep.bg, color: currentStep.color, border: `1px solid ${currentStep.border}` }}>
@@ -209,9 +204,7 @@ export default function PedidosPage() {
                     )}
 
                     {!nextStep && (
-                      <span style={{ fontSize: '12px', color: '#00ff94', fontWeight: 600 }}>
-                        ✅ Proceso completo
-                      </span>
+                      <span style={{ fontSize: '12px', color: '#00ff94', fontWeight: 600 }}>✅ Proceso completo</span>
                     )}
                   </div>
                 </div>

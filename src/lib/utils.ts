@@ -59,3 +59,67 @@ export const CASH_FLOW_CATEGORY_LABELS: Record<string, string> = {
   retiro: 'Retiro',
   otro: 'Otro',
 }
+
+// ── WhatsApp Business ────────────────────────────────────────────
+
+export function generateWhatsAppLink(phone: string, message: string): string {
+  const cleanPhone = phone.replace(/\D/g, '')
+  const phoneWithCode = cleanPhone.startsWith('57') ? cleanPhone : `57${cleanPhone}`
+  const encodedMessage = encodeURIComponent(message)
+  return `https://wa.me/${phoneWithCode}?text=${encodedMessage}`
+}
+
+export function whatsAppVentaMessage(
+  clientName: string,
+  product: string,
+  quantity: number,
+  total: number
+): string {
+  return `Hola ${clientName} 👋
+
+Te confirmamos tu pedido de *Taply NFC*:
+
+📦 Producto: *${product}*
+🔢 Cantidad: ${quantity} unidad${quantity !== 1 ? 'es' : ''}
+💰 Total: *${new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(total)}*
+
+En breve nos ponemos en contacto contigo para coordinar la entrega. ¡Gracias por tu compra! 🚀
+
+— Equipo Taply NFC`
+}
+
+export function whatsAppPedidoMessage(
+  clientName: string,
+  product: string,
+  orderStatus: string
+): string {
+  const statusMessages: Record<string, string> = {
+    recibido:      `Hemos recibido tu pedido y está en cola de producción. ⏳`,
+    en_produccion: `Tu tarjeta *${product}* está siendo personalizada en este momento. ⚙️`,
+    listo:         `¡Tu tarjeta *${product}* está lista! Coordinaremos la entrega pronto. ✅`,
+    enviado:       `Tu pedido ya fue enviado y está en camino. 🚚`,
+    entregado:     `¡Tu *${product}* fue entregada con éxito! Esperamos que la disfrutes. 🎉`,
+  }
+
+  return `Hola ${clientName} 👋
+
+*Actualización de tu pedido Taply NFC:*
+
+${statusMessages[orderStatus] ?? 'Tu pedido ha sido actualizado.'}
+
+¿Tienes alguna pregunta? Estamos aquí para ayudarte. 💬
+
+— Equipo Taply NFC`
+}
+
+export function whatsAppSeguimientoMessage(clientName: string): string {
+  return `Hola ${clientName} 👋
+
+Te escribimos desde *Taply NFC* para hacer un seguimiento.
+
+¿Cómo ha sido tu experiencia con tu tarjeta? Nos encantaría saber si la estás usando y si tienes alguna duda o necesitas actualizar tu información.
+
+Recuerda que las actualizaciones de tu perfil están incluidas en el servicio. ✨
+
+— Equipo Taply NFC`
+}

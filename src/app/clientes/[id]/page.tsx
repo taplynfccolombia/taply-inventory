@@ -5,8 +5,8 @@ import { useParams, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import type { Client, Sale } from '@/lib/supabase'
 import { PRODUCT_CONFIG } from '@/lib/supabase'
-import { formatCOP, formatDate, formatDateTime, PAYMENT_METHOD_LABELS, SALE_STATUS_LABELS } from '@/lib/utils'
-import { ArrowLeft, User, ShoppingCart, TrendingUp, DollarSign, Ban } from 'lucide-react'
+import { formatCOP, formatDate, formatDateTime, PAYMENT_METHOD_LABELS, SALE_STATUS_LABELS, generateWhatsAppLink, whatsAppSeguimientoMessage, whatsAppVentaMessage } from '@/lib/utils'
+import { ArrowLeft, User, ShoppingCart, TrendingUp, DollarSign, Ban, MessageCircle } from 'lucide-react'
 
 export default function ClienteDetallePage() {
   const { id } = useParams()
@@ -67,6 +67,10 @@ export default function ClienteDetallePage() {
     )
   }
 
+  const seguimientoLink = client.phone
+    ? generateWhatsAppLink(client.phone, whatsAppSeguimientoMessage(client.full_name))
+    : null
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
 
@@ -88,11 +92,19 @@ export default function ClienteDetallePage() {
               </p>
             </div>
           </div>
-          {completedSales.length > 0 && (
-            <span style={{ padding: '6px 16px', borderRadius: '999px', fontSize: '12px', fontWeight: 700, backgroundColor: '#00ff940d', border: '1px solid #00ff9422', color: '#00ff94' }}>
-              ⭐ Cliente activo
-            </span>
-          )}
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+            {seguimientoLink && (
+              <a href={seguimientoLink} target="_blank" rel="noopener noreferrer"
+                style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 18px', borderRadius: '12px', fontSize: '13px', fontWeight: 700, textDecoration: 'none', backgroundColor: '#00ff940d', border: '1px solid #00ff9422', color: '#00ff94' }}>
+                <MessageCircle size={16} /> Mensaje de seguimiento
+              </a>
+            )}
+            {completedSales.length > 0 && (
+              <span style={{ padding: '6px 16px', borderRadius: '999px', fontSize: '12px', fontWeight: 700, backgroundColor: '#00ff940d', border: '1px solid #00ff9422', color: '#00ff94' }}>
+                ⭐ Cliente activo
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
@@ -119,13 +131,16 @@ export default function ClienteDetallePage() {
         </div>
       </div>
 
-      {/* KPIs del cliente */}
+      {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
         {[
-          { label: 'Total Comprado', value: formatCOP(totalRevenue), color: '#00cfff', bg: '#00cfff0d', border: '#00cfff22', icon: DollarSign },
-          { label: 'Ganancia Generada', value: formatCOP(totalProfit), color: '#00ff94', bg: '#00ff940d', border: '#00ff9422', icon: TrendingUp },
-          { label: 'Compras Completadas', value: String(completedSales.length), color: '#00cfff', bg: '#00cfff0d', border: '#00cfff22', icon: ShoppingCart },
-          { label: 'Cobros Pendientes', value: pendingCount > 0 ? formatCOP(pendingRevenue) : '$0', color: pendingCount > 0 ? '#ffb547' : '#4b5563', bg: pendingCount > 0 ? '#ffb5470d' : '#161616', border: pendingCount > 0 ? '#ffb54722' : '#1f1f1f', icon: ShoppingCart },
+          { label: 'Total Comprado',       value: formatCOP(totalRevenue),                                           color: '#00cfff', bg: '#00cfff0d', border: '#00cfff22', icon: DollarSign },
+          { label: 'Ganancia Generada',    value: formatCOP(totalProfit),                                            color: '#00ff94', bg: '#00ff940d', border: '#00ff9422', icon: TrendingUp },
+          { label: 'Compras Completadas',  value: String(completedSales.length),                                     color: '#00cfff', bg: '#00cfff0d', border: '#00cfff22', icon: ShoppingCart },
+          { label: 'Cobros Pendientes',    value: pendingCount > 0 ? formatCOP(pendingRevenue) : '$0',
+            color: pendingCount > 0 ? '#ffb547' : '#4b5563',
+            bg:    pendingCount > 0 ? '#ffb5470d' : '#161616',
+            border:pendingCount > 0 ? '#ffb54722' : '#1f1f1f', icon: ShoppingCart },
         ].map(({ label, value, color, bg, border, icon: Icon }) => (
           <div key={label} style={{ borderRadius: '14px', padding: '20px', backgroundColor: bg, border: `1px solid ${border}` }}>
             <Icon size={18} style={{ color, marginBottom: '12px' }} />
@@ -140,7 +155,7 @@ export default function ClienteDetallePage() {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
           {[
             { label: 'Taply Essential', count: essentialCount, color: '#00cfff', bg: '#00cfff0d', border: '#00cfff22' },
-            { label: 'Taply Custom', count: customCount, color: '#00ff94', bg: '#00ff940d', border: '#00ff9422' },
+            { label: 'Taply Custom',    count: customCount,    color: '#00ff94', bg: '#00ff940d', border: '#00ff9422' },
           ].map(({ label, count, color, bg, border }) => (
             <div key={label} style={{ borderRadius: '14px', padding: '20px', backgroundColor: bg, border: `1px solid ${border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <span style={{ fontSize: '14px', fontWeight: 600, color: '#f0f0f0' }}>{label}</span>
@@ -182,47 +197,69 @@ export default function ClienteDetallePage() {
                 </tr>
               </thead>
               <tbody>
-                {sales.map((sale, i) => (
-                  <tr key={sale.id} style={{ backgroundColor: i % 2 === 0 ? '#0d0d0d' : '#111111', borderBottom: '1px solid #161616', opacity: sale.status === 'cancelada' ? 0.5 : 1 }}>
-                    <td style={{ padding: '14px 20px', color: '#6b7280' }}>{formatDateTime(sale.sale_date)}</td>
-                    <td style={{ padding: '14px 20px', fontWeight: 600, color: '#00cfff' }}>{PRODUCT_CONFIG[sale.product_type].label}</td>
-                    <td style={{ padding: '14px 20px', textAlign: 'center', color: '#f0f0f0' }}>{sale.quantity}</td>
-                    <td style={{ padding: '14px 20px', fontWeight: 600, color: '#00cfff' }}>{formatCOP(sale.total_revenue)}</td>
-                    <td style={{ padding: '14px 20px', fontWeight: 600, color: '#00ff94' }}>{formatCOP(sale.total_profit)}</td>
-                    <td style={{ padding: '14px 20px', color: '#9ca3af' }}>{PAYMENT_METHOD_LABELS[sale.payment_method]}</td>
-                    <td style={{ padding: '14px 20px' }}>
-                      <span style={{ padding: '4px 12px', borderRadius: '999px', fontSize: '12px', fontWeight: 600,
-                        backgroundColor: sale.status === 'completada' ? '#00ff940d' : sale.status === 'pendiente' ? '#ffb5470d' : '#ff4d4d0d',
-                        color: sale.status === 'completada' ? '#00ff94' : sale.status === 'pendiente' ? '#ffb547' : '#ff4d4d' }}>
-                        {SALE_STATUS_LABELS[sale.status]}
-                      </span>
-                    </td>
-                    <td style={{ padding: '14px 20px' }}>
-                      {sale.status !== 'cancelada' && (
-                        confirmCancel === sale.id ? (
-                          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                            <span style={{ fontSize: '12px', color: '#ffb547' }}>¿Cancelar?</span>
-                            <button onClick={() => handleCancel(sale.id)} disabled={cancellingId === sale.id}
-                              style={{ padding: '4px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', border: 'none', backgroundColor: '#ffb547', color: '#0d0d0d' }}>
-                              {cancellingId === sale.id ? '...' : 'Sí'}
-                            </button>
-                            <button onClick={() => setConfirmCancel(null)}
-                              style={{ padding: '4px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', border: '1px solid #2a2a2a', backgroundColor: 'transparent', color: '#6b7280' }}>
-                              No
-                            </button>
-                          </div>
-                        ) : (
-                          <button onClick={() => setConfirmCancel(sale.id)}
-                            style={{ padding: '6px', borderRadius: '8px', cursor: 'pointer', backgroundColor: 'transparent', border: '1px solid #1f1f1f', color: '#374151', display: 'flex', alignItems: 'center' }}
-                            onMouseEnter={e => { (e.currentTarget).style.backgroundColor = '#ffb5470d'; (e.currentTarget).style.color = '#ffb547' }}
-                            onMouseLeave={e => { (e.currentTarget).style.backgroundColor = 'transparent'; (e.currentTarget).style.color = '#374151' }}>
-                            <Ban size={14} />
-                          </button>
+                {sales.map((sale, i) => {
+                  const waLink = client.phone
+                    ? generateWhatsAppLink(
+                        client.phone,
+                        whatsAppVentaMessage(
+                          client.full_name,
+                          PRODUCT_CONFIG[sale.product_type].label,
+                          sale.quantity,
+                          Number(sale.total_revenue)
                         )
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                      )
+                    : null
+
+                  return (
+                    <tr key={sale.id} style={{ backgroundColor: i % 2 === 0 ? '#0d0d0d' : '#111111', borderBottom: '1px solid #161616', opacity: sale.status === 'cancelada' ? 0.5 : 1 }}>
+                      <td style={{ padding: '14px 20px', color: '#6b7280' }}>{formatDateTime(sale.sale_date)}</td>
+                      <td style={{ padding: '14px 20px', fontWeight: 600, color: '#00cfff' }}>{PRODUCT_CONFIG[sale.product_type].label}</td>
+                      <td style={{ padding: '14px 20px', textAlign: 'center', color: '#f0f0f0' }}>{sale.quantity}</td>
+                      <td style={{ padding: '14px 20px', fontWeight: 600, color: '#00cfff' }}>{formatCOP(sale.total_revenue)}</td>
+                      <td style={{ padding: '14px 20px', fontWeight: 600, color: '#00ff94' }}>{formatCOP(sale.total_profit)}</td>
+                      <td style={{ padding: '14px 20px', color: '#9ca3af' }}>{PAYMENT_METHOD_LABELS[sale.payment_method]}</td>
+                      <td style={{ padding: '14px 20px' }}>
+                        <span style={{ padding: '4px 12px', borderRadius: '999px', fontSize: '12px', fontWeight: 600,
+                          backgroundColor: sale.status === 'completada' ? '#00ff940d' : sale.status === 'pendiente' ? '#ffb5470d' : '#ff4d4d0d',
+                          color: sale.status === 'completada' ? '#00ff94' : sale.status === 'pendiente' ? '#ffb547' : '#ff4d4d' }}>
+                          {SALE_STATUS_LABELS[sale.status]}
+                        </span>
+                      </td>
+                      <td style={{ padding: '14px 20px' }}>
+                        <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                          {waLink && sale.status !== 'cancelada' && (
+                            <a href={waLink} target="_blank" rel="noopener noreferrer"
+                              title="Enviar confirmación por WhatsApp"
+                              style={{ display: 'flex', alignItems: 'center', padding: '6px', borderRadius: '8px', textDecoration: 'none', backgroundColor: '#00ff940d', border: '1px solid #00ff9422', color: '#00ff94' }}>
+                              <MessageCircle size={14} />
+                            </a>
+                          )}
+                          {sale.status !== 'cancelada' && (
+                            confirmCancel === sale.id ? (
+                              <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                                <button onClick={() => handleCancel(sale.id)} disabled={cancellingId === sale.id}
+                                  style={{ padding: '4px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', border: 'none', backgroundColor: '#ffb547', color: '#0d0d0d' }}>
+                                  {cancellingId === sale.id ? '...' : 'Sí'}
+                                </button>
+                                <button onClick={() => setConfirmCancel(null)}
+                                  style={{ padding: '4px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', border: '1px solid #2a2a2a', backgroundColor: 'transparent', color: '#6b7280' }}>
+                                  No
+                                </button>
+                              </div>
+                            ) : (
+                              <button onClick={() => setConfirmCancel(sale.id)}
+                                style={{ padding: '6px', borderRadius: '8px', cursor: 'pointer', backgroundColor: 'transparent', border: '1px solid #1f1f1f', color: '#374151', display: 'flex', alignItems: 'center' }}
+                                onMouseEnter={e => { (e.currentTarget).style.backgroundColor = '#ffb5470d'; (e.currentTarget).style.color = '#ffb547' }}
+                                onMouseLeave={e => { (e.currentTarget).style.backgroundColor = 'transparent'; (e.currentTarget).style.color = '#374151' }}>
+                                <Ban size={14} />
+                              </button>
+                            )
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
