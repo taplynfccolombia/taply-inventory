@@ -3,19 +3,20 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { TaplyLogo } from './TaplyLogo'
-import { LayoutDashboard, ShoppingCart, Package, Users, Wallet, CheckSquare, Settings } from 'lucide-react'
+import { LayoutDashboard, ShoppingCart, Package, Users, Wallet, CheckSquare, Sparkles, Settings } from 'lucide-react'
 
 const navItems = [
-  { href: '/',               label: 'Dashboard',     icon: LayoutDashboard },
-  { href: '/ventas',         label: 'Ventas',         icon: ShoppingCart },
-  { href: '/inventario',     label: 'Inventario',     icon: Package },
-  { href: '/clientes',       label: 'Clientes',       icon: Users },
-  { href: '/flujo-caja',     label: 'Flujo de Caja',  icon: Wallet },
-  { href: '/tareas',         label: 'Tareas',         icon: CheckSquare },
+  { href: '/',           label: 'Dashboard',    icon: LayoutDashboard },
+  { href: '/ventas',     label: 'Ventas',        icon: ShoppingCart },
+  { href: '/inventario', label: 'Inventario',    icon: Package },
+  { href: '/clientes',   label: 'Clientes',      icon: Users },
+  { href: '/flujo-caja', label: 'Flujo de Caja', icon: Wallet },
+  { href: '/tareas',     label: 'Tareas',        icon: CheckSquare },
+  { href: '/contenido',  label: 'Contenido',     icon: Sparkles },
 ]
 
 const bottomItems = [
-  { href: '/configuracion',  label: 'Configuración',  icon: Settings },
+  { href: '/configuracion', label: 'Configuración', icon: Settings },
 ]
 
 export function Navbar() {
@@ -61,7 +62,7 @@ export function Navbar() {
       </div>
 
       {/* Nav principal */}
-      <nav style={{ flex: 1, padding: '0 16px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+      <nav style={{ flex: 1, padding: '0 16px', display: 'flex', flexDirection: 'column', gap: '4px', overflowY: 'auto' }}>
         {navItems.map(item => <NavLink key={item.href} {...item} />)}
       </nav>
 
