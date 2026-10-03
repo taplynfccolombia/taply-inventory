@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase'
 import type { Sale } from '@/lib/supabase'
 import { PRODUCT_CONFIG } from '@/lib/supabase'
 import { formatCOP, formatDateTime, PAYMENT_METHOD_LABELS, SALE_STATUS_LABELS, exportToCSV } from '@/lib/utils'
-import { ShoppingCart, Plus, X, Ban, Download } from 'lucide-react'
+import { ShoppingCart, Plus, X, Ban, Download, Search } from 'lucide-react'
 
 interface ClientBasic {
   id: string
@@ -24,6 +24,9 @@ export default function VentasPage() {
   const [stockQty, setStockQty] = useState(0)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [activeTab, setActiveTab] = useState<'todas' | 'pendientes'>('todas')
+  const [search, setSearch] = useState('')
+  const [filterProduct, setFilterProduct] = useState<'todos' | 'essential' | 'custom'>('todos')
+  const [filterPayment, setFilterPayment] = useState<string>('todos')
 
   const [form, setForm] = useState({
     client_id: '',
@@ -94,7 +97,7 @@ export default function VentasPage() {
   }
 
   function handleExportCSV() {
-    const data = sales.map(s => ({
+    const data = filteredSales.map(s => ({
       Fecha: formatDateTime(s.sale_date),
       Producto: PRODUCT_CONFIG[s.product_type].label,
       Cliente: (s.client as unknown as ClientBasic)?.full_name ?? '—',
@@ -111,7 +114,22 @@ export default function VentasPage() {
 
   const pendingSales = sales.filter(s => s.status === 'pendiente')
   const pendingRevenue = pendingSales.reduce((acc, s) => acc + Number(s.total_revenue), 0)
-  const displaySales = activeTab === 'pendientes' ? pendingSales : sales
+
+  // Filtros combinados
+  const baseSales = activeTab === 'pendientes' ? pendingSales : sales
+  const filteredSales = baseSales.filter(s => {
+    const clientData = s.client as unknown as ClientBasic | null
+    const matchSearch = search === '' ||
+      (clientData?.full_name ?? '').toLowerCase().includes(search.toLowerCase()) ||
+      PRODUCT_CONFIG[s.product_type].label.toLowerCase().includes(search.toLowerCase()) ||
+      (s.notes ?? '').toLowerCase().includes(search.toLowerCase())
+    const matchProduct = filterProduct === 'todos' || s.product_type === filterProduct
+    const matchPayment = filterPayment === 'todos' || s.payment_method === filterPayment
+    return matchSearch && matchProduct && matchPayment
+  })
+
+  const totalFilteredRevenue = filteredSales.filter(s => s.status === 'completada').reduce((acc, s) => acc + Number(s.total_revenue), 0)
+  const totalFilteredProfit = filteredSales.filter(s => s.status === 'completada').reduce((acc, s) => acc + Number(s.total_profit), 0)
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
@@ -123,7 +141,9 @@ export default function VentasPage() {
           <p style={{ margin: '6px 0 0', fontSize: '14px', color: '#6b7280' }}>
             {sales.filter(s => s.status === 'completada').length} completadas
             {' · '}
-            <span style={{ color: stockQty < 5 ? '#ff4d4d' : '#00ff94' }}>Stock: {stockQty} uds</span>
+            <span style={{ color: stockQty < 5 ? '#ff4d4d' : '#00ff94' }}>
+              {stockQty < 5 ? '⚠ ' : ''}Stock: {stockQty} uds
+            </span>
             {pendingSales.length > 0 && (
               <span style={{ color: '#ffb547', marginLeft: '8px' }}>
                 · ⚠ {pendingSales.length} cobro{pendingSales.length !== 1 ? 's' : ''} pendiente{pendingSales.length !== 1 ? 's' : ''} ({formatCOP(pendingRevenue)})
@@ -132,8 +152,8 @@ export default function VentasPage() {
           </p>
         </div>
         <div style={{ display: 'flex', gap: '10px' }}>
-          <button onClick={handleExportCSV} disabled={sales.length === 0}
-            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 18px', borderRadius: '12px', fontWeight: 600, fontSize: '13px', cursor: sales.length === 0 ? 'not-allowed' : 'pointer', border: '1px solid #2a2a2a', backgroundColor: 'transparent', color: '#6b7280' }}>
+          <button onClick={handleExportCSV} disabled={filteredSales.length === 0}
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 18px', borderRadius: '12px', fontWeight: 600, fontSize: '13px', cursor: filteredSales.length === 0 ? 'not-allowed' : 'pointer', border: '1px solid #2a2a2a', backgroundColor: 'transparent', color: '#6b7280' }}>
             <Download size={15} /> CSV
           </button>
           <button onClick={() => { setShowForm(!showForm); setMessage(null) }}
@@ -145,6 +165,22 @@ export default function VentasPage() {
           </button>
         </div>
       </div>
+
+      {/* Alerta stock bajo */}
+      {stockQty < 5 && stockQty > 0 && (
+        <div style={{ padding: '14px 20px', borderRadius: '12px', backgroundColor: '#ffb5470d', border: '1px solid #ffb54722' }}>
+          <span style={{ fontSize: '14px', color: '#ffb547', fontWeight: 600 }}>
+            ⚠ Stock bajo: solo quedan {stockQty} unidad{stockQty !== 1 ? 'es' : ''}. Considera reabastecer pronto.
+          </span>
+        </div>
+      )}
+      {stockQty === 0 && (
+        <div style={{ padding: '14px 20px', borderRadius: '12px', backgroundColor: '#ff4d4d0d', border: '1px solid #ff4d4d22' }}>
+          <span style={{ fontSize: '14px', color: '#ff4d4d', fontWeight: 600 }}>
+            🚨 Sin stock disponible. No puedes registrar ventas completadas hasta reabastecer.
+          </span>
+        </div>
+      )}
 
       {/* Alerta cobros pendientes */}
       {pendingSales.length > 0 && activeTab === 'todas' && (
@@ -212,7 +248,6 @@ export default function VentasPage() {
                 style={{ width: '100%', padding: '12px 16px', borderRadius: '10px', fontSize: '14px', outline: 'none', backgroundColor: '#0d0d0d', border: '1px solid #2a2a2a', color: '#f0f0f0', boxSizing: 'border-box' }} />
             </div>
           </div>
-
           <div style={{ marginTop: '24px', padding: '20px', borderRadius: '12px', backgroundColor: '#0d0d0d', border: '1px solid #1f1f1f', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
             {[
               { label: 'Ingreso',  value: formatCOP(totalRevenue), color: '#00cfff' },
@@ -225,7 +260,6 @@ export default function VentasPage() {
               </div>
             ))}
           </div>
-
           {message && showForm && (
             <div style={{ marginTop: '16px', padding: '12px 16px', borderRadius: '10px', fontSize: '14px',
               backgroundColor: message.type === 'success' ? '#00ff940d' : '#ff4d4d0d',
@@ -255,7 +289,7 @@ export default function VentasPage() {
 
       {/* Tabs */}
       <div style={{ display: 'flex', gap: '4px', padding: '4px', borderRadius: '10px', backgroundColor: '#161616', border: '1px solid #1f1f1f', alignSelf: 'flex-start' }}>
-        {([['todas', 'Todas las ventas'], ['pendientes', `Cobros pendientes ${pendingSales.length > 0 ? `(${pendingSales.length})` : ''}`]] as const).map(([tab, label]) => (
+        {([['todas', 'Todas las ventas'], ['pendientes', `Cobros pendientes${pendingSales.length > 0 ? ` (${pendingSales.length})` : ''}`]] as const).map(([tab, label]) => (
           <button key={tab} onClick={() => setActiveTab(tab)}
             style={{ padding: '8px 20px', borderRadius: '7px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', border: 'none',
               backgroundColor: activeTab === tab ? (tab === 'pendientes' ? '#ffb5470d' : '#00cfff0d') : 'transparent',
@@ -263,6 +297,42 @@ export default function VentasPage() {
             {label}
           </button>
         ))}
+      </div>
+
+      {/* Filtros */}
+      <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+        {/* Búsqueda */}
+        <div style={{ position: 'relative', flex: 1, minWidth: '200px' }}>
+          <Search size={15} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#6b7280' }} />
+          <input type="text" value={search} onChange={e => setSearch(e.target.value)}
+            placeholder="Buscar por cliente, producto o notas..."
+            style={{ width: '100%', padding: '10px 14px 10px 40px', borderRadius: '10px', fontSize: '13px', outline: 'none', backgroundColor: '#161616', border: '1px solid #1f1f1f', color: '#f0f0f0', boxSizing: 'border-box' }} />
+        </div>
+        {/* Filtro producto */}
+        <select value={filterProduct} onChange={e => setFilterProduct(e.target.value as typeof filterProduct)}
+          style={{ padding: '10px 14px', borderRadius: '10px', fontSize: '13px', outline: 'none', backgroundColor: '#161616', border: '1px solid #1f1f1f', color: '#f0f0f0' }}>
+          <option value="todos">Todos los productos</option>
+          <option value="essential">Essential</option>
+          <option value="custom">Custom</option>
+        </select>
+        {/* Filtro pago */}
+        <select value={filterPayment} onChange={e => setFilterPayment(e.target.value)}
+          style={{ padding: '10px 14px', borderRadius: '10px', fontSize: '13px', outline: 'none', backgroundColor: '#161616', border: '1px solid #1f1f1f', color: '#f0f0f0' }}>
+          <option value="todos">Todos los métodos</option>
+          {Object.entries(PAYMENT_METHOD_LABELS).map(([val, label]) => <option key={val} value={val}>{label}</option>)}
+        </select>
+        {/* Resultados */}
+        {(search || filterProduct !== 'todos' || filterPayment !== 'todos') && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span style={{ fontSize: '13px', color: '#6b7280' }}>
+              {filteredSales.length} resultado{filteredSales.length !== 1 ? 's' : ''} · {formatCOP(totalFilteredRevenue)} · Ganancia: {formatCOP(totalFilteredProfit)}
+            </span>
+            <button onClick={() => { setSearch(''); setFilterProduct('todos'); setFilterPayment('todos') }}
+              style={{ padding: '4px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', backgroundColor: 'transparent', border: '1px solid #2a2a2a', color: '#6b7280' }}>
+              Limpiar
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Tabla */}
@@ -278,7 +348,7 @@ export default function VentasPage() {
           <tbody>
             {loading ? (
               [...Array(3)].map((_, i) => (
-                <tr key={i} style={{ borderBottom: '1px solid #161616' }}>
+                <tr key={i}>
                   {[...Array(9)].map((_, j) => (
                     <td key={j} style={{ padding: '16px 20px' }}>
                       <div style={{ height: '16px', borderRadius: '6px', backgroundColor: '#1f1f1f' }} />
@@ -286,15 +356,15 @@ export default function VentasPage() {
                   ))}
                 </tr>
               ))
-            ) : displaySales.length === 0 ? (
+            ) : filteredSales.length === 0 ? (
               <tr>
                 <td colSpan={9} style={{ padding: '48px', textAlign: 'center', color: '#4b5563' }}>
                   <ShoppingCart size={32} style={{ margin: '0 auto 12px', display: 'block', opacity: 0.3 }} />
-                  {activeTab === 'pendientes' ? '¡No hay cobros pendientes!' : 'Aún no hay ventas registradas.'}
+                  {activeTab === 'pendientes' ? '¡No hay cobros pendientes!' : search || filterProduct !== 'todos' || filterPayment !== 'todos' ? 'No hay ventas que coincidan con los filtros.' : 'Aún no hay ventas registradas.'}
                 </td>
               </tr>
             ) : (
-              displaySales.map((sale, i) => {
+              filteredSales.map((sale, i) => {
                 const clientData = sale.client as unknown as ClientBasic | null
                 return (
                   <tr key={sale.id} style={{ backgroundColor: i % 2 === 0 ? '#0d0d0d' : '#111111', borderBottom: '1px solid #161616', opacity: sale.status === 'cancelada' ? 0.5 : 1 }}>
@@ -316,7 +386,7 @@ export default function VentasPage() {
                       {sale.status === 'pendiente' ? (
                         <div style={{ display: 'flex', gap: '6px' }}>
                           <button onClick={() => handleMarkCompleted(sale.id)} title="Marcar como cobrada"
-                            style={{ padding: '6px', borderRadius: '8px', cursor: 'pointer', backgroundColor: '#00ff940d', border: '1px solid #00ff9422', color: '#00ff94', display: 'flex', alignItems: 'center' }}>
+                            style={{ padding: '6px 10px', borderRadius: '8px', cursor: 'pointer', backgroundColor: '#00ff940d', border: '1px solid #00ff9422', color: '#00ff94', fontSize: '13px', fontWeight: 700 }}>
                             ✓
                           </button>
                           {confirmCancel === sale.id ? (
@@ -332,9 +402,7 @@ export default function VentasPage() {
                             </div>
                           ) : (
                             <button onClick={() => setConfirmCancel(sale.id)}
-                              style={{ padding: '6px', borderRadius: '8px', cursor: 'pointer', backgroundColor: 'transparent', border: '1px solid #1f1f1f', color: '#374151', display: 'flex', alignItems: 'center' }}
-                              onMouseEnter={e => { (e.currentTarget).style.backgroundColor = '#ffb5470d'; (e.currentTarget).style.color = '#ffb547' }}
-                              onMouseLeave={e => { (e.currentTarget).style.backgroundColor = 'transparent'; (e.currentTarget).style.color = '#374151' }}>
+                              style={{ padding: '6px', borderRadius: '8px', cursor: 'pointer', backgroundColor: 'transparent', border: '1px solid #1f1f1f', color: '#374151', display: 'flex', alignItems: 'center' }}>
                               <Ban size={15} />
                             </button>
                           )}
@@ -355,14 +423,12 @@ export default function VentasPage() {
                         ) : (
                           <button onClick={() => setConfirmCancel(sale.id)}
                             style={{ padding: '8px', borderRadius: '8px', cursor: 'pointer', backgroundColor: 'transparent', border: '1px solid #1f1f1f', color: '#374151', display: 'flex', alignItems: 'center' }}
-                            onMouseEnter={e => { (e.currentTarget).style.backgroundColor = '#ffb5470d'; (e.currentTarget).style.borderColor = '#ffb54722'; (e.currentTarget).style.color = '#ffb547' }}
-                            onMouseLeave={e => { (e.currentTarget).style.backgroundColor = 'transparent'; (e.currentTarget).style.borderColor = '#1f1f1f'; (e.currentTarget).style.color = '#374151' }}>
+                            onMouseEnter={e => { (e.currentTarget).style.backgroundColor = '#ffb5470d'; (e.currentTarget).style.color = '#ffb547' }}
+                            onMouseLeave={e => { (e.currentTarget).style.backgroundColor = 'transparent'; (e.currentTarget).style.color = '#374151' }}>
                             <Ban size={15} />
                           </button>
                         )
-                      ) : (
-                        <span style={{ fontSize: '12px', color: '#374151' }}>—</span>
-                      )}
+                      ) : <span style={{ fontSize: '12px', color: '#374151' }}>—</span>}
                     </td>
                   </tr>
                 )
