@@ -20,80 +20,48 @@ html, body {
 
 input, select, textarea { font-family: inherit; }
 
-/* ── DESKTOP ──────────────────────────────────────── */
+/* Layout principal */
 .main-content {
   flex: 1;
   padding: 40px;
   overflow-x: hidden;
   max-width: 100%;
+  min-width: 0;
+}
+
+/* Tablas con scroll */
+.table-container {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  width: 100%;
 }
 
 /* ── MÓVIL ────────────────────────────────────────── */
 @media (max-width: 768px) {
+
   .main-content {
     padding: 16px !important;
     padding-top: 72px !important;
-    padding-bottom: 100px !important;
+    padding-bottom: 90px !important;
     margin-left: 0 !important;
   }
 
-  /* Títulos */
-  h1 { font-size: 22px !important; }
-  h2 { font-size: 17px !important; }
-  h3 { font-size: 14px !important; }
-
-  /* Grids — todo a 2 columnas en móvil */
-  [style*="grid-template-columns: repeat(5"] {
-    grid-template-columns: repeat(2, 1fr) !important;
-  }
-  [style*="grid-template-columns: repeat(4"] {
-    grid-template-columns: repeat(2, 1fr) !important;
-  }
-  [style*="grid-template-columns: repeat(3"] {
-    grid-template-columns: repeat(2, 1fr) !important;
-  }
-  [style*="grid-template-columns: 2fr 1fr"] {
-    grid-template-columns: 1fr !important;
-  }
-  [style*="grid-template-columns: 1fr 1fr 1fr"] {
-    grid-template-columns: 1fr 1fr !important;
-  }
-  [style*="gridTemplateColumns: 'repeat(5"] {
-    grid-template-columns: repeat(2, 1fr) !important;
-  }
-
-  /* Tablas — scroll horizontal */
-  table { font-size: 12px !important; }
-  th, td { padding: 10px 12px !important; }
-
-  /* Ocultar columnas menos importantes en tablas móvil */
-  .hide-mobile { display: none !important; }
-
-  /* Botones touch-friendly */
-  button { min-height: 38px; }
-
-  /* Selector período — wrap */
-  [style*="display: 'flex'"][style*="gap: '4px'"] {
-    flex-wrap: wrap !important;
-  }
-
-  /* Botones de sesión — más pequeños y arriba del fold */
+  /* Botones sesión en móvil */
   .session-buttons {
-    bottom: 68px !important;
+    position: fixed !important;
+    bottom: 72px !important;
     right: 8px !important;
-    gap: 4px !important;
-    flex-direction: column !important;
-    align-items: flex-end !important;
+    left: 8px !important;
+    z-index: 100 !important;
+    display: flex !important;
+    gap: 6px !important;
+    flex-direction: row !important;
   }
-  .session-buttons button {
-    padding: 6px 10px !important;
-    font-size: 11px !important;
-  }
-}
 
-/* ── TABLET ───────────────────────────────────────── */
-@media (max-width: 1024px) and (min-width: 769px) {
-  [style*="grid-template-columns: repeat(5"] {
-    grid-template-columns: repeat(3, 1fr) !important;
+  .session-buttons button {
+    flex: 1 !important;
+    padding: 8px 10px !important;
+    font-size: 12px !important;
+    justify-content: center !important;
   }
 }

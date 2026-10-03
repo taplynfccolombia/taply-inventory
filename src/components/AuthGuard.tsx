@@ -106,7 +106,9 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   return (
     <>
       {children}
-      <div style={{ position: 'fixed', bottom: '20px', right: '20px', zIndex: 100, display: 'flex', gap: '8px', alignItems: 'center' }}>
+
+      {/* Botones sesión */}
+      <div className="session-buttons" style={{ position: 'fixed', bottom: '20px', right: '20px', zIndex: 100, display: 'flex', gap: '8px', alignItems: 'center' }}>
         <button onClick={() => setShowChangePassword(true)}
           style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px', borderRadius: '10px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', backgroundColor: '#161616', border: '1px solid #1f1f1f', color: '#6b7280' }}
           onMouseEnter={e => { (e.currentTarget).style.color = '#00cfff'; (e.currentTarget).style.borderColor = '#00cfff22' }}
@@ -121,6 +123,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
         </button>
       </div>
 
+      {/* Modal: Confirmar cerrar sesión */}
       {showLogoutConfirm && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: '#0d0d0dcc', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
           <div style={{ width: '100%', maxWidth: '380px', borderRadius: '20px', padding: '32px', backgroundColor: '#161616', border: '1px solid #1f1f1f' }}>
@@ -145,6 +148,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
         </div>
       )}
 
+      {/* Modal: Cambiar contraseña */}
       {showChangePassword && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: '#0d0d0dcc', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
           <div style={{ width: '100%', maxWidth: '420px', borderRadius: '20px', padding: '32px', backgroundColor: '#161616', border: '1px solid #1f1f1f' }}>
