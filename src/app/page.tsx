@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { TaplyLogo } from '@/components/TaplyLogo'
+import { MonthlyGoal } from '@/components/MonthlyGoal'
 import { formatCOP } from '@/lib/utils'
 import { TrendingUp, ShoppingCart, Package, DollarSign, Users, ArrowUpRight } from 'lucide-react'
 import {
@@ -32,16 +33,10 @@ interface SaleData {
 const formatTooltipArea = (value: any, name: any) => {
   return [formatCOP(Number(value)), name === 'ingresos' ? 'Ingresos' : 'Ganancia']
 }
-
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const formatTooltipBar = (value: any) => {
-  return [Number(value), 'Ventas']
-}
-
+const formatTooltipBar = (value: any) => [Number(value), 'Ventas']
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const formatTooltipPie = (value: any, name: any) => {
-  return [String(value) + ' uds', String(name)]
-}
+const formatTooltipPie = (value: any, name: any) => [String(value) + ' uds', String(name)]
 
 export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats>({
@@ -77,6 +72,15 @@ export default function DashboardPage() {
     }
     fetchStats()
   }, [])
+
+  // Ventas del mes actual
+  const now = new Date()
+  const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  const monthSales = salesData.filter(s =>
+    s.sale_date.startsWith(currentMonthKey) && s.status === 'completada'
+  )
+  const monthRevenue = monthSales.reduce((acc, s) => acc + Number(s.total_revenue), 0)
+  const monthSalesCount = monthSales.length
 
   const last7Days = Array.from({ length: 7 }, (_, i) => {
     const d = new Date()
@@ -153,6 +157,12 @@ export default function DashboardPage() {
             ))
         }
       </div>
+
+      {/* Meta mensual */}
+      <MonthlyGoal
+        currentRevenue={monthRevenue}
+        currentSales={monthSalesCount}
+      />
 
       {/* Gráfica de área */}
       <div style={{ borderRadius: '16px', padding: '28px', backgroundColor: '#161616', border: '1px solid #1f1f1f' }}>
