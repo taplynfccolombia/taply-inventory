@@ -23,9 +23,14 @@ export default function ProfilePage() {
 
   useEffect(() => {
     async function fetchProfile() {
-      const { data, error } = await supabase.from('nfc_profiles').select('*').eq('slug', slug).eq('is_active', true).single()
+      const { data, error } = await supabase
+        .from('nfc_profiles').select('*').eq('slug', slug).eq('is_active', true).single()
       if (error || !data) { setNotFound(true) }
-      else { setProfile(data as NFCProfile) }
+      else {
+        setProfile(data as NFCProfile)
+        // Incrementar vistas automáticamente
+        await supabase.rpc('increment_profile_views', { profile_slug: slug })
+      }
       setLoading(false)
     }
     if (slug) fetchProfile()

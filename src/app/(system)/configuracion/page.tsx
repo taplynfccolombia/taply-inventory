@@ -1,32 +1,34 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
-import { logout, login } from '@/lib/auth'
+import { logout, changePassword, getPasswordStatus } from '@/lib/auth'
 import { useRouter } from 'next/navigation'
 import { AlertTriangle, Trash2, Shield, Info, LogOut, KeyRound, Eye, EyeOff } from 'lucide-react'
+import { useIsMobile } from '@/lib/hooks'
 
 type ResetStep = 'idle' | 'confirm1' | 'confirm2' | 'resetting' | 'done' | 'error'
 
 export default function ConfiguracionPage() {
   const router = useRouter()
+  const isMobile = useIsMobile()
   const [resetStep, setResetStep] = useState<ResetStep>('idle')
   const [confirmText, setConfirmText] = useState('')
   const [errorMsg, setErrorMsg] = useState('')
-
-  // Cambiar contraseña
   const [showChangePwd, setShowChangePwd] = useState(false)
   const [pwdForm, setPwdForm] = useState({ current: '', newPass: '', confirm: '' })
   const [pwdError, setPwdError] = useState('')
   const [pwdSuccess, setPwdSuccess] = useState('')
   const [showPwd, setShowPwd] = useState(false)
-
-  // Cerrar sesión
   const [showLogout, setShowLogout] = useState(false)
+  const [passwordStatus, setPasswordStatus] = useState<{ isDefault: boolean; expiryDate: Date | null } | null>(null)
+
+  useEffect(() => {
+    setPasswordStatus(getPasswordStatus())
+  }, [])
 
   async function handleReset() {
-    setResetStep('resetting')
-    setErrorMsg('')
+    setResetStep('resetting'); setErrorMsg('')
     try {
       const { error: e1 } = await supabase.from('sales').delete().neq('id', '00000000-0000-0000-0000-000000000000')
       if (e1) throw new Error(`Ventas: ${e1.message}`)
@@ -36,12 +38,14 @@ export default function ConfiguracionPage() {
       if (e3) throw new Error(`Clientes: ${e3.message}`)
       const { error: e4 } = await supabase.from('tasks').delete().neq('id', '00000000-0000-0000-0000-000000000000')
       if (e4) throw new Error(`Tareas: ${e4.message}`)
-      const { error: e5b } = await supabase.from('content_board').delete().neq('id', '00000000-0000-0000-0000-000000000000')
-      if (e5b) throw new Error(`Contenido: ${e5b.message}`)
-      const { error: e5c } = await supabase.from('goals').delete().neq('id', '00000000-0000-0000-0000-000000000000')
-      if (e5c) throw new Error(`Metas: ${e5c.message}`)
-      const { error: e5 } = await supabase.from('inventory').update({ quantity: 0, notes: 'Stock físico único. Toda venta (Essential o Custom) descuenta 1 unidad.' }).eq('item_name', 'Tarjeta Negra Matte Base')
-      if (e5) throw new Error(`Inventario: ${e5.message}`)
+      const { error: e5 } = await supabase.from('content_board').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+      if (e5) throw new Error(`Contenido: ${e5.message}`)
+      const { error: e6 } = await supabase.from('goals').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+      if (e6) throw new Error(`Metas: ${e6.message}`)
+      const { error: e7 } = await supabase.from('nfc_profiles').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+      if (e7) throw new Error(`Perfiles NFC: ${e7.message}`)
+      const { error: e8 } = await supabase.from('inventory').update({ quantity: 0 }).eq('item_name', 'Tarjeta Negra Matte Base')
+      if (e8) throw new Error(`Inventario: ${e8.message}`)
       setResetStep('done')
     } catch (err: unknown) {
       setErrorMsg(err instanceof Error ? err.message : 'Error desconocido')
@@ -52,12 +56,12 @@ export default function ConfiguracionPage() {
   function handleChangePassword(e: React.FormEvent) {
     e.preventDefault()
     setPwdError(''); setPwdSuccess('')
-    if (!login(pwdForm.current)) { setPwdError('La contraseña actual es incorrecta.'); return }
-    if (pwdForm.newPass.length < 6) { setPwdError('La nueva contraseña debe tener al menos 6 caracteres.'); return }
     if (pwdForm.newPass !== pwdForm.confirm) { setPwdError('Las contraseñas nuevas no coinciden.'); return }
-    localStorage.setItem('taply_custom_password', pwdForm.newPass)
+    const result = changePassword(pwdForm.current, pwdForm.newPass)
+    if (!result.success) { setPwdError(result.error ?? 'Error desconocido.'); return }
     setPwdSuccess('✅ Contraseña actualizada correctamente.')
     setPwdForm({ current: '', newPass: '', confirm: '' })
+    setPasswordStatus(getPasswordStatus())
     setTimeout(() => { setShowChangePwd(false); setPwdSuccess('') }, 2000)
   }
 
@@ -70,9 +74,8 @@ export default function ConfiguracionPage() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
 
-      {/* Header */}
       <div>
-        <h1 style={{ margin: 0, fontSize: '32px', fontWeight: 900 }} className="taply-gradient-text">Configuración</h1>
+        <h1 style={{ margin: 0, fontSize: isMobile ? '24px' : '32px', fontWeight: 900 }} className="taply-gradient-text">Configuración</h1>
         <p style={{ margin: '6px 0 0', fontSize: '14px', color: '#6b7280' }}>Ajustes del sistema y seguridad</p>
       </div>
 
@@ -82,7 +85,7 @@ export default function ConfiguracionPage() {
           <Info size={18} style={{ color: '#00cfff' }} />
           <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#f0f0f0' }}>Información del Sistema</h2>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '12px' }}>
           {[
             { label: 'Versión', value: 'v1.0.0' },
             { label: 'Stack', value: 'Next.js 16 + Supabase' },
@@ -105,8 +108,27 @@ export default function ConfiguracionPage() {
           <Shield size={18} style={{ color: '#00cfff' }} />
           <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#f0f0f0' }}>Seguridad</h2>
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
 
+        {/* Alerta contraseña por defecto */}
+        {passwordStatus?.isDefault && (
+          <div style={{ marginBottom: '16px', padding: '12px 16px', borderRadius: '10px', backgroundColor: '#ffb5470d', border: '1px solid #ffb54722', display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <AlertTriangle size={15} style={{ color: '#ffb547', flexShrink: 0 }} />
+            <p style={{ margin: 0, fontSize: '13px', color: '#ffb547', fontWeight: 600 }}>
+              Estás usando la contraseña por defecto. Se recomienda cambiarla.
+            </p>
+          </div>
+        )}
+
+        {/* Info sesión */}
+        {passwordStatus?.expiryDate && (
+          <div style={{ marginBottom: '16px', padding: '12px 16px', borderRadius: '10px', backgroundColor: '#00cfff0d', border: '1px solid #00cfff22' }}>
+            <p style={{ margin: 0, fontSize: '12px', color: '#00cfff' }}>
+              🔐 Sesión activa · Expira: {passwordStatus.expiryDate.toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' })}
+            </p>
+          </div>
+        )}
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           {/* Cambiar contraseña */}
           <div style={{ borderRadius: '12px', overflow: 'hidden', border: '1px solid #1f1f1f' }}>
             <button onClick={() => setShowChangePwd(!showChangePwd)}
@@ -115,11 +137,10 @@ export default function ConfiguracionPage() {
                 <KeyRound size={18} style={{ color: '#00cfff' }} />
                 <div>
                   <p style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: '#f0f0f0' }}>Cambiar contraseña</p>
-                  <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#6b7280' }}>Actualiza la contraseña de acceso al sistema</p>
+                  <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#6b7280' }}>Sesión se mantiene activa por 7 días</p>
                 </div>
               </div>
             </button>
-
             {showChangePwd && (
               <div style={{ padding: '20px', borderTop: '1px solid #1f1f1f', backgroundColor: '#0d0d0d' }}>
                 <form onSubmit={handleChangePassword} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -164,20 +185,16 @@ export default function ConfiguracionPage() {
           {/* Cerrar sesión */}
           <div style={{ borderRadius: '12px', border: '1px solid #1f1f1f' }}>
             <button onClick={() => setShowLogout(!showLogout)}
-              style={{ width: '100%', padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#0d0d0d', border: 'none', cursor: 'pointer', textAlign: 'left', borderRadius: '12px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <LogOut size={18} style={{ color: '#ff4d4d' }} />
-                <div>
-                  <p style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: '#f0f0f0' }}>Cerrar sesión</p>
-                  <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#6b7280' }}>Salir del sistema — necesitarás tu contraseña para volver</p>
-                </div>
+              style={{ width: '100%', padding: '16px 20px', display: 'flex', alignItems: 'center', gap: '12px', backgroundColor: '#0d0d0d', border: 'none', cursor: 'pointer', textAlign: 'left', borderRadius: '12px' }}>
+              <LogOut size={18} style={{ color: '#ff4d4d' }} />
+              <div>
+                <p style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: '#f0f0f0' }}>Cerrar sesión</p>
+                <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#6b7280' }}>La sesión expira automáticamente a los 7 días</p>
               </div>
             </button>
             {showLogout && (
               <div style={{ padding: '16px 20px', borderTop: '1px solid #1f1f1f', backgroundColor: '#0d0d0d' }}>
-                <p style={{ margin: '0 0 14px', fontSize: '13px', color: '#9ca3af' }}>
-                  ¿Estás seguro que quieres cerrar sesión?
-                </p>
+                <p style={{ margin: '0 0 14px', fontSize: '13px', color: '#9ca3af' }}>¿Estás seguro que quieres cerrar sesión?</p>
                 <div style={{ display: 'flex', gap: '10px' }}>
                   <button onClick={handleLogout}
                     style={{ flex: 1, padding: '10px', borderRadius: '10px', fontWeight: 700, fontSize: '13px', cursor: 'pointer', border: 'none', backgroundColor: '#ff4d4d', color: '#fff' }}>
@@ -201,7 +218,7 @@ export default function ConfiguracionPage() {
           <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#ff4d4d' }}>Zona de Peligro</h2>
         </div>
         <p style={{ margin: '0 0 20px', fontSize: '13px', color: '#6b7280', lineHeight: '1.6' }}>
-          Las acciones de esta sección son irreversibles. Úsalas solo para pruebas o reinicio completo del sistema.
+          Las acciones de esta sección son irreversibles.
         </p>
 
         {resetStep === 'idle' && (
@@ -211,7 +228,7 @@ export default function ConfiguracionPage() {
               <div style={{ flex: 1 }}>
                 <h3 style={{ margin: '0 0 8px', fontSize: '15px', fontWeight: 700, color: '#f0f0f0' }}>Resetear Sistema Completo</h3>
                 <p style={{ margin: '0 0 16px', fontSize: '13px', color: '#9ca3af', lineHeight: '1.6' }}>
-                  Eliminará <strong style={{ color: '#ff4d4d' }}>permanentemente</strong> todas las ventas, clientes, movimientos de caja, tareas y contenido. El inventario quedará en 0. <strong style={{ color: '#ff4d4d' }}>No se puede deshacer.</strong>
+                  Elimina <strong style={{ color: '#ff4d4d' }}>permanentemente</strong> todas las ventas, clientes, movimientos de caja, tareas, perfiles NFC y contenido. El inventario queda en 0.
                 </p>
                 <button onClick={() => setResetStep('confirm1')}
                   style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', borderRadius: '10px', fontWeight: 700, fontSize: '13px', cursor: 'pointer', border: '1px solid #ff4d4d44', backgroundColor: '#ff4d4d11', color: '#ff4d4d' }}>
@@ -228,7 +245,7 @@ export default function ConfiguracionPage() {
               <AlertTriangle size={18} style={{ color: '#ffb547' }} />
               <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: '#ffb547' }}>Primera confirmación</h3>
             </div>
-            <p style={{ margin: '0 0 16px', fontSize: '13px', color: '#9ca3af' }}>¿Estás seguro de que quieres eliminar TODOS los datos del sistema?</p>
+            <p style={{ margin: '0 0 16px', fontSize: '13px', color: '#9ca3af' }}>¿Estás seguro de que quieres eliminar TODOS los datos?</p>
             <div style={{ display: 'flex', gap: '10px' }}>
               <button onClick={() => setResetStep('confirm2')}
                 style={{ padding: '10px 20px', borderRadius: '10px', fontWeight: 700, fontSize: '13px', cursor: 'pointer', border: 'none', backgroundColor: '#ffb547', color: '#0d0d0d' }}>
@@ -249,14 +266,12 @@ export default function ConfiguracionPage() {
               <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: '#ff4d4d' }}>Confirmación final</h3>
             </div>
             <p style={{ margin: '0 0 12px', fontSize: '13px', color: '#9ca3af' }}>Escribe <strong style={{ color: '#ff4d4d' }}>RESETEAR</strong> para confirmar:</p>
-            <input type="text" value={confirmText} onChange={e => setConfirmText(e.target.value)}
-              placeholder="Escribe RESETEAR"
+            <input type="text" value={confirmText} onChange={e => setConfirmText(e.target.value)} placeholder="Escribe RESETEAR"
               style={{ width: '100%', padding: '12px 14px', borderRadius: '10px', fontSize: '14px', outline: 'none', backgroundColor: '#0d0d0d', border: '1px solid #ff4d4d33', color: '#f0f0f0', boxSizing: 'border-box', marginBottom: '14px' }} />
             <div style={{ display: 'flex', gap: '10px' }}>
               <button onClick={handleReset} disabled={confirmText !== 'RESETEAR'}
                 style={{ padding: '10px 20px', borderRadius: '10px', fontWeight: 700, fontSize: '13px', cursor: confirmText === 'RESETEAR' ? 'pointer' : 'not-allowed', border: 'none',
-                  backgroundColor: confirmText === 'RESETEAR' ? '#ff4d4d' : '#2a2a2a',
-                  color: confirmText === 'RESETEAR' ? '#fff' : '#6b7280' }}>
+                  backgroundColor: confirmText === 'RESETEAR' ? '#ff4d4d' : '#2a2a2a', color: confirmText === 'RESETEAR' ? '#fff' : '#6b7280' }}>
                 ⚠ Resetear Permanentemente
               </button>
               <button onClick={() => { setResetStep('idle'); setConfirmText('') }}
