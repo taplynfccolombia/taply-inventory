@@ -154,3 +154,12 @@ export function exportToCSV(data: Record<string, unknown>[], filename: string) {
   document.body.removeChild(link)
   URL.revokeObjectURL(url)
 }
+
+// ── Días transcurridos ───────────────────────────────────────────
+
+export function daysSince(dateString: string): number {
+  const date = new Date(dateString)
+  const now = new Date()
+  const diff = now.getTime() - date.getTime()
+  return Math.floor(diff / (1000 * 60 * 60 * 24))
+}

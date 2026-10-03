@@ -1,42 +1,40 @@
-import type { Metadata } from 'next'
-import { Geist, Geist_Mono } from 'next/font/google'
+import type { Metadata, Viewport } from 'next'
 import './globals.css'
 import { Navbar } from '@/components/Navbar'
-
-const geistSans = Geist({
-  variable: '--font-geist-sans',
-  subsets: ['latin'],
-})
-
-const geistMono = Geist_Mono({
-  variable: '--font-geist-mono',
-  subsets: ['latin'],
-})
+import { AuthGuard } from '@/components/AuthGuard'
 
 export const metadata: Metadata = {
-  title: 'Taply — Inventory & Sales',
-  description: 'Sistema de gestión de inventario y ventas para Taply NFC',
+  title: 'Taply Inventory',
+  description: 'Sistema de Gestión NFC — Taply',
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'Taply',
+  },
+  icons: {
+    apple: '/icon-192.png',
+  },
 }
 
-export default function RootLayout({
-  children,
-}: Readonly<{ children: React.ReactNode }>) {
+export const viewport: Viewport = {
+  themeColor: '#00cfff',
+  width: 'device-width',
+  initialScale: 1,
+}
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="es">
-      <body className={`${geistSans.variable} ${geistMono.variable}`}>
-        <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#0d0d0d' }}>
-          <Navbar />
-          <main style={{
-            flex: 1,
-            marginLeft: '280px',
-            padding: '56px 72px',
-            minHeight: '100vh',
-            backgroundColor: '#0d0d0d',
-            overflowY: 'auto',
-          }}>
-            {children}
-          </main>
-        </div>
+      <body>
+        <AuthGuard>
+          <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#0d0d0d' }}>
+            <Navbar />
+            <main style={{ flex: 1, padding: '40px', overflowX: 'hidden' }}>
+              {children}
+            </main>
+          </div>
+        </AuthGuard>
       </body>
     </html>
   )

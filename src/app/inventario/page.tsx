@@ -2,241 +2,254 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import type { Inventory } from '@/lib/supabase'
 import { formatCOP, formatDateTime } from '@/lib/utils'
 import { Package, Plus, Minus, AlertTriangle } from 'lucide-react'
 
+interface InventoryLog {
+  id: string
+  created_at: string
+  change_type: 'add' | 'subtract' | 'sale' | 'cancel'
+  quantity_change: number
+  quantity_after: number
+  notes: string | null
+}
+
 export default function InventarioPage() {
-  const [inventory, setInventory] = useState<Inventory | null>(null)
+  const [stock, setStock] = useState(0)
+  const [logs, setLogs] = useState<InventoryLog[]>([])
   const [loading, setLoading] = useState(true)
-  const [adjustQty, setAdjustQty] = useState('')
-  const [adjustNote, setAdjustNote] = useState('')
   const [adjustType, setAdjustType] = useState<'add' | 'subtract'>('add')
+  const [quantity, setQuantity] = useState('1')
+  const [notes, setNotes] = useState('')
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
-  async function fetchInventory() {
-    const { data, error } = await supabase
-      .from('inventory')
-      .select('*')
-      .eq('item_name', 'Tarjeta Negra Matte Base')
-      .single()
-    if (!error && data) setInventory(data)
+  async function fetchData() {
+    const [inventoryRes, logsRes] = await Promise.all([
+      supabase.from('inventory').select('*').eq('item_name', 'Tarjeta Negra Matte Base').single(),
+      supabase.from('inventory_logs').select('*').order('created_at', { ascending: false }).limit(50),
+    ])
+    setStock(inventoryRes.data?.quantity ?? 0)
+    setLogs(logsRes.data ?? [])
     setLoading(false)
   }
 
-  useEffect(() => { fetchInventory() }, [])
+  useEffect(() => { fetchData() }, [])
 
   async function handleAdjust() {
-    if (!inventory || !adjustQty || Number(adjustQty) <= 0) return
-    setSaving(true)
-    setMessage(null)
-
-    const qty = Number(adjustQty)
-    const newQty = adjustType === 'add'
-      ? inventory.quantity + qty
-      : inventory.quantity - qty
-
-    if (newQty < 0) {
-      setMessage({ type: 'error', text: 'No puedes tener stock negativo.' })
-      setSaving(false)
-      return
+    const qty = Number(quantity)
+    if (qty <= 0) { setMessage({ type: 'error', text: 'La cantidad debe ser mayor a 0.' }); return }
+    if (adjustType === 'subtract' && qty > stock) {
+      setMessage({ type: 'error', text: `No puedes restar más del stock actual (${stock} uds).` }); return
     }
+    setSaving(true); setMessage(null)
 
-    const { error } = await supabase
+    const newStock = adjustType === 'add' ? stock + qty : stock - qty
+    const { error: invError } = await supabase
       .from('inventory')
-      .update({ quantity: newQty, notes: adjustNote || inventory.notes })
-      .eq('id', inventory.id)
+      .update({ quantity: newStock })
+      .eq('item_name', 'Tarjeta Negra Matte Base')
 
-    if (error) {
-      setMessage({ type: 'error', text: 'Error al actualizar el stock.' })
-    } else {
-      setMessage({ type: 'success', text: `Stock actualizado a ${newQty} unidades.` })
-      setAdjustQty('')
-      setAdjustNote('')
-      fetchInventory()
-    }
+    if (invError) { setMessage({ type: 'error', text: 'Error al actualizar el inventario.' }); setSaving(false); return }
+
+    // Registrar en el log
+    await supabase.from('inventory_logs').insert([{
+      change_type: adjustType,
+      quantity_change: adjustType === 'add' ? qty : -qty,
+      quantity_after: newStock,
+      notes: notes.trim() || null,
+    }])
+
+    setMessage({ type: 'success', text: `Stock ${adjustType === 'add' ? 'aumentado' : 'reducido'} correctamente. Nuevo stock: ${newStock} uds.` })
+    setQuantity('1'); setNotes('')
+    fetchData()
     setSaving(false)
   }
 
-  const stockStatus = !inventory
-    ? null
-    : inventory.quantity === 0
-    ? { label: 'Sin Stock', color: '#ff4d4d', bg: '#ff4d4d11', border: '#ff4d4d33' }
-    : inventory.quantity < 5
-    ? { label: 'Stock Bajo', color: '#ffb547', bg: '#ffb54711', border: '#ffb54733' }
-    : { label: 'Stock OK', color: '#00ff94', bg: '#00ff9411', border: '#00ff9433' }
+  const stockStatus = stock === 0 ? 'sin_stock' : stock < 5 ? 'bajo' : 'ok'
+  const stockColor = stockStatus === 'sin_stock' ? '#ff4d4d' : stockStatus === 'bajo' ? '#ffb547' : '#00ff94'
+  const stockLabel = stockStatus === 'sin_stock' ? '🚨 Sin Stock' : stockStatus === 'bajo' ? '⚠ Stock Bajo' : '✅ Stock OK'
+
+  const LOG_LABELS: Record<string, { label: string; color: string }> = {
+    add:      { label: '+ Agregado',       color: '#00ff94' },
+    subtract: { label: '− Restado',        color: '#ffb547' },
+    sale:     { label: '↓ Venta',          color: '#00cfff' },
+    cancel:   { label: '↑ Cancelación',    color: '#a78bfa' },
+  }
 
   return (
-    <div className="space-y-8">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-black taply-gradient-text">Inventario</h1>
-        <p className="text-sm mt-1" style={{ color: '#6b7280' }}>
-          Control del stock físico de tarjetas NFC
+        <h1 style={{ margin: 0, fontSize: '32px', fontWeight: 900 }} className="taply-gradient-text">Inventario</h1>
+        <p style={{ margin: '6px 0 0', fontSize: '14px', color: '#6b7280' }}>
+          Control de stock — Tarjeta Negra Matte Base
         </p>
       </div>
 
-      {loading ? (
-        <div className="rounded-2xl p-8 animate-pulse" style={{ backgroundColor: '#161616', border: '1px solid #2a2a2a' }} />
-      ) : inventory ? (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Stock principal */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '20px' }}>
+        <div style={{ borderRadius: '16px', padding: '32px', backgroundColor: stockColor + '0d', border: `1px solid ${stockColor}22`, textAlign: 'center' }}>
+          <Package size={32} style={{ color: stockColor, margin: '0 auto 16px', display: 'block' }} />
+          <p style={{ margin: 0, fontSize: '64px', fontWeight: 900, color: stockColor, lineHeight: 1 }}>{stock}</p>
+          <p style={{ margin: '8px 0 0', fontSize: '14px', color: '#6b7280' }}>unidades disponibles</p>
+          <span style={{ display: 'inline-block', marginTop: '12px', padding: '4px 14px', borderRadius: '999px', fontSize: '12px', fontWeight: 700, backgroundColor: stockColor + '0d', color: stockColor, border: `1px solid ${stockColor}33` }}>
+            {stockLabel}
+          </span>
+        </div>
 
-          {/* Card de stock actual */}
-          <div className="rounded-2xl p-8" style={{ backgroundColor: '#161616', border: '1px solid #2a2a2a' }}>
-            <div className="flex items-center gap-3 mb-6">
-              <Package size={24} style={{ color: '#00cfff' }} />
-              <h2 className="text-xl font-bold" style={{ color: '#f0f0f0' }}>
-                {inventory.item_name}
-              </h2>
-            </div>
+        <div style={{ borderRadius: '16px', padding: '32px', backgroundColor: '#161616', border: '1px solid #1f1f1f', textAlign: 'center' }}>
+          <p style={{ margin: '0 0 8px', fontSize: '13px', color: '#6b7280' }}>Valor del stock</p>
+          <p style={{ margin: 0, fontSize: '32px', fontWeight: 900, color: '#00cfff' }}>{formatCOP(stock * 2000)}</p>
+          <p style={{ margin: '8px 0 0', fontSize: '12px', color: '#374151' }}>× $2.000 costo/unidad</p>
+        </div>
 
-            <div className="text-center py-6">
-              <p className="text-8xl font-black taply-gradient-text">
-                {inventory.quantity}
-              </p>
-              <p className="text-lg mt-2" style={{ color: '#6b7280' }}>unidades disponibles</p>
-            </div>
+        <div style={{ borderRadius: '16px', padding: '32px', backgroundColor: '#161616', border: '1px solid #1f1f1f', textAlign: 'center' }}>
+          <p style={{ margin: '0 0 8px', fontSize: '13px', color: '#6b7280' }}>Movimientos registrados</p>
+          <p style={{ margin: 0, fontSize: '32px', fontWeight: 900, color: '#00ff94' }}>{logs.length}</p>
+          <p style={{ margin: '8px 0 0', fontSize: '12px', color: '#374151' }}>últimos 50 movimientos</p>
+        </div>
+      </div>
 
-            {stockStatus && (
-              <div className="flex justify-center mt-4">
-                <span
-                  className="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold"
-                  style={{ backgroundColor: stockStatus.bg, color: stockStatus.color, border: `1px solid ${stockStatus.border}` }}
-                >
-                  {inventory.quantity < 5 && <AlertTriangle size={14} />}
-                  {stockStatus.label}
-                </span>
-              </div>
-            )}
+      {/* Alerta */}
+      {stockStatus !== 'ok' && (
+        <div style={{ padding: '14px 20px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '12px',
+          backgroundColor: stockStatus === 'sin_stock' ? '#ff4d4d0d' : '#ffb5470d',
+          border: `1px solid ${stockStatus === 'sin_stock' ? '#ff4d4d22' : '#ffb54722'}` }}>
+          <AlertTriangle size={18} style={{ color: stockColor, flexShrink: 0 }} />
+          <span style={{ fontSize: '14px', fontWeight: 600, color: stockColor }}>
+            {stockStatus === 'sin_stock'
+              ? '🚨 Sin stock disponible. No puedes registrar ventas completadas hasta reabastecer.'
+              : `⚠ Stock bajo: solo quedan ${stock} unidad${stock !== 1 ? 'es' : ''}. Considera reabastecer pronto.`}
+          </span>
+        </div>
+      )}
 
-            <div className="mt-6 pt-6 space-y-2" style={{ borderTop: '1px solid #2a2a2a' }}>
-              <div className="flex justify-between text-sm">
-                <span style={{ color: '#6b7280' }}>Costo por unidad</span>
-                <span style={{ color: '#f0f0f0' }} className="font-semibold">
-                  {formatCOP(inventory.cost_per_unit)}
-                </span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span style={{ color: '#6b7280' }}>Valor total del stock</span>
-                <span style={{ color: '#00ff94' }} className="font-semibold">
-                  {formatCOP(inventory.quantity * inventory.cost_per_unit)}
-                </span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span style={{ color: '#6b7280' }}>Última actualización</span>
-                <span style={{ color: '#9ca3af' }}>{formatDateTime(inventory.updated_at)}</span>
-              </div>
+      {/* Ajuste manual */}
+      <div style={{ borderRadius: '16px', padding: '28px', backgroundColor: '#161616', border: '1px solid #1f1f1f' }}>
+        <h2 style={{ margin: '0 0 20px', fontSize: '18px', fontWeight: 700, color: '#f0f0f0' }}>Ajuste Manual de Stock</h2>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+          <div>
+            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#9ca3af', marginBottom: '8px' }}>Tipo de ajuste</label>
+            <div style={{ display: 'flex', gap: '12px' }}>
+              {([
+                { type: 'add',      label: '+ Agregar',  icon: Plus,  color: '#00ff94', bg: '#00ff940d', border: '#00ff9433' },
+                { type: 'subtract', label: '− Restar',   icon: Minus, color: '#ffb547', bg: '#ffb5470d', border: '#ffb54733' },
+              ] as const).map(({ type, label, icon: Icon, color, bg, border }) => (
+                <button key={type} onClick={() => setAdjustType(type)}
+                  style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '14px', borderRadius: '12px', fontSize: '14px', fontWeight: 700, cursor: 'pointer',
+                    backgroundColor: adjustType === type ? bg : '#0d0d0d',
+                    border: adjustType === type ? `1px solid ${border}` : '1px solid #2a2a2a',
+                    color: adjustType === type ? color : '#6b7280' }}>
+                  <Icon size={16} /> {label}
+                </button>
+              ))}
             </div>
           </div>
 
-          {/* Card de ajuste de stock */}
-          <div className="rounded-2xl p-8" style={{ backgroundColor: '#161616', border: '1px solid #2a2a2a' }}>
-            <h2 className="text-xl font-bold mb-6" style={{ color: '#f0f0f0' }}>
-              Ajustar Stock
-            </h2>
+          <div>
+            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#9ca3af', marginBottom: '8px' }}>Cantidad de unidades</label>
+            <input type="number" min="1" value={quantity} onChange={e => setQuantity(e.target.value)}
+              style={{ width: '100%', padding: '14px 16px', borderRadius: '12px', fontSize: '16px', fontWeight: 700, outline: 'none', backgroundColor: '#0d0d0d', border: '1px solid #2a2a2a', color: '#f0f0f0', boxSizing: 'border-box', textAlign: 'center' }} />
+          </div>
 
-            {/* Tipo de ajuste */}
-            <div className="flex gap-3 mb-6">
-              <button
-                onClick={() => setAdjustType('add')}
-                className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold transition-all"
-                style={{
-                  backgroundColor: adjustType === 'add' ? '#00ff9411' : '#0d0d0d',
-                  border: adjustType === 'add' ? '1px solid #00ff9433' : '1px solid #2a2a2a',
-                  color: adjustType === 'add' ? '#00ff94' : '#6b7280',
-                }}
-              >
-                <Plus size={16} /> Agregar
-              </button>
-              <button
-                onClick={() => setAdjustType('subtract')}
-                className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold transition-all"
-                style={{
-                  backgroundColor: adjustType === 'subtract' ? '#ff4d4d11' : '#0d0d0d',
-                  border: adjustType === 'subtract' ? '1px solid #ff4d4d33' : '1px solid #2a2a2a',
-                  color: adjustType === 'subtract' ? '#ff4d4d' : '#6b7280',
-                }}
-              >
-                <Minus size={16} /> Restar
-              </button>
-            </div>
-
-            {/* Cantidad */}
-            <div className="mb-4">
-              <label className="block text-sm font-medium mb-2" style={{ color: '#9ca3af' }}>
-                Cantidad de unidades
-              </label>
-              <input
-                type="number"
-                min="1"
-                value={adjustQty}
-                onChange={e => setAdjustQty(e.target.value)}
-                placeholder="Ej: 10"
-                className="w-full px-4 py-3 rounded-xl text-sm outline-none transition-all"
-                style={{
-                  backgroundColor: '#0d0d0d',
-                  border: '1px solid #2a2a2a',
-                  color: '#f0f0f0',
-                }}
-                onFocus={e => e.target.style.borderColor = '#00cfff55'}
-                onBlur={e => e.target.style.borderColor = '#2a2a2a'}
-              />
-            </div>
-
-            {/* Nota */}
-            <div className="mb-6">
-              <label className="block text-sm font-medium mb-2" style={{ color: '#9ca3af' }}>
-                Nota (opcional)
-              </label>
-              <input
-                type="text"
-                value={adjustNote}
-                onChange={e => setAdjustNote(e.target.value)}
-                placeholder="Ej: Compra a proveedor"
-                className="w-full px-4 py-3 rounded-xl text-sm outline-none transition-all"
-                style={{
-                  backgroundColor: '#0d0d0d',
-                  border: '1px solid #2a2a2a',
-                  color: '#f0f0f0',
-                }}
-                onFocus={e => e.target.style.borderColor = '#00cfff55'}
-                onBlur={e => e.target.style.borderColor = '#2a2a2a'}
-              />
-            </div>
-
-            {/* Mensaje */}
-            {message && (
-              <div
-                className="mb-4 px-4 py-3 rounded-xl text-sm"
-                style={{
-                  backgroundColor: message.type === 'success' ? '#00ff9411' : '#ff4d4d11',
-                  border: `1px solid ${message.type === 'success' ? '#00ff9433' : '#ff4d4d33'}`,
-                  color: message.type === 'success' ? '#00ff94' : '#ff4d4d',
-                }}
-              >
-                {message.text}
-              </div>
-            )}
-
-            {/* Botón */}
-            <button
-              onClick={handleAdjust}
-              disabled={saving || !adjustQty}
-              className="w-full py-3 rounded-xl font-bold text-sm transition-all"
-              style={{
-                background: saving || !adjustQty ? '#2a2a2a' : 'linear-gradient(90deg, #00cfff, #00ff94)',
-                color: saving || !adjustQty ? '#6b7280' : '#0d0d0d',
-                cursor: saving || !adjustQty ? 'not-allowed' : 'pointer',
-              }}
-            >
-              {saving ? 'Guardando...' : 'Confirmar Ajuste'}
-            </button>
+          <div style={{ gridColumn: 'span 2' }}>
+            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#9ca3af', marginBottom: '8px' }}>Motivo del ajuste (opcional)</label>
+            <input type="text" value={notes} onChange={e => setNotes(e.target.value)}
+              placeholder="Ej: Compra a proveedor, corrección de conteo, etc."
+              style={{ width: '100%', padding: '12px 16px', borderRadius: '10px', fontSize: '14px', outline: 'none', backgroundColor: '#0d0d0d', border: '1px solid #2a2a2a', color: '#f0f0f0', boxSizing: 'border-box' }} />
           </div>
         </div>
-      ) : (
-        <p style={{ color: '#ff4d4d' }}>No se encontró el inventario base.</p>
-      )}
+
+        {/* Preview del resultado */}
+        {Number(quantity) > 0 && (
+          <div style={{ marginTop: '16px', padding: '16px', borderRadius: '10px', backgroundColor: '#0d0d0d', border: '1px solid #1f1f1f', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '16px' }}>
+            <span style={{ fontSize: '20px', fontWeight: 900, color: '#6b7280' }}>{stock}</span>
+            <span style={{ fontSize: '16px', color: adjustType === 'add' ? '#00ff94' : '#ffb547' }}>
+              {adjustType === 'add' ? `+${quantity}` : `-${quantity}`}
+            </span>
+            <span style={{ fontSize: '16px', color: '#6b7280' }}>=</span>
+            <span style={{ fontSize: '24px', fontWeight: 900, color: adjustType === 'add' ? '#00ff94' : '#ffb547' }}>
+              {adjustType === 'add' ? stock + Number(quantity) : Math.max(0, stock - Number(quantity))} uds
+            </span>
+          </div>
+        )}
+
+        {message && (
+          <div style={{ marginTop: '16px', padding: '12px 16px', borderRadius: '10px', fontSize: '14px',
+            backgroundColor: message.type === 'success' ? '#00ff940d' : '#ff4d4d0d',
+            border: `1px solid ${message.type === 'success' ? '#00ff9422' : '#ff4d4d22'}`,
+            color: message.type === 'success' ? '#00ff94' : '#ff4d4d' }}>
+            {message.text}
+          </div>
+        )}
+
+        <button onClick={handleAdjust} disabled={saving || Number(quantity) <= 0}
+          style={{ marginTop: '20px', padding: '14px 32px', borderRadius: '12px', fontWeight: 700, fontSize: '14px', border: 'none',
+            background: saving ? '#2a2a2a' : 'linear-gradient(90deg, #00cfff, #00ff94)',
+            color: saving ? '#6b7280' : '#0d0d0d', cursor: saving ? 'not-allowed' : 'pointer' }}>
+          {saving ? 'Guardando...' : `Confirmar ${adjustType === 'add' ? 'Aumento' : 'Reducción'} de Stock`}
+        </button>
+      </div>
+
+      {/* Historial de movimientos */}
+      <div>
+        <h2 style={{ margin: '0 0 16px', fontSize: '20px', fontWeight: 700, color: '#f0f0f0' }}>
+          Historial de Movimientos
+        </h2>
+        <div style={{ borderRadius: '16px', overflow: 'hidden', border: '1px solid #1f1f1f' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
+            <thead>
+              <tr style={{ backgroundColor: '#161616', borderBottom: '1px solid #1f1f1f' }}>
+                {['Fecha', 'Tipo', 'Cambio', 'Stock resultante', 'Motivo'].map(h => (
+                  <th key={h} style={{ textAlign: 'left', padding: '14px 20px', fontWeight: 600, color: '#6b7280' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                [...Array(3)].map((_, i) => (
+                  <tr key={i}>
+                    {[...Array(5)].map((_, j) => (
+                      <td key={j} style={{ padding: '14px 20px' }}>
+                        <div style={{ height: '16px', borderRadius: '6px', backgroundColor: '#1f1f1f' }} />
+                      </td>
+                    ))}
+                  </tr>
+                ))
+              ) : logs.length === 0 ? (
+                <tr>
+                  <td colSpan={5} style={{ padding: '48px', textAlign: 'center', color: '#4b5563' }}>
+                    <Package size={32} style={{ margin: '0 auto 12px', display: 'block', opacity: 0.3 }} />
+                    No hay movimientos registrados aún.
+                  </td>
+                </tr>
+              ) : (
+                logs.map((log, i) => {
+                  const logStyle = LOG_LABELS[log.change_type] ?? { label: log.change_type, color: '#6b7280' }
+                  return (
+                    <tr key={log.id} style={{ backgroundColor: i % 2 === 0 ? '#0d0d0d' : '#111111', borderBottom: '1px solid #161616' }}>
+                      <td style={{ padding: '14px 20px', color: '#6b7280' }}>{formatDateTime(log.created_at)}</td>
+                      <td style={{ padding: '14px 20px' }}>
+                        <span style={{ padding: '4px 12px', borderRadius: '999px', fontSize: '12px', fontWeight: 600,
+                          backgroundColor: logStyle.color + '0d', color: logStyle.color, border: `1px solid ${logStyle.color}22` }}>
+                          {logStyle.label}
+                        </span>
+                      </td>
+                      <td style={{ padding: '14px 20px', fontWeight: 700, color: log.quantity_change > 0 ? '#00ff94' : '#ff4d4d' }}>
+                        {log.quantity_change > 0 ? `+${log.quantity_change}` : log.quantity_change}
+                      </td>
+                      <td style={{ padding: '14px 20px', fontWeight: 700, color: '#f0f0f0' }}>{log.quantity_after} uds</td>
+                      <td style={{ padding: '14px 20px', color: '#9ca3af' }}>{log.notes ?? '—'}</td>
+                    </tr>
+                  )
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   )
 }
