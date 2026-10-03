@@ -30,20 +30,27 @@ interface SaleData {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const formatTooltipArea = (value: any, name: any) => {
-  return [formatCOP(Number(value)), name === 'ingresos' ? 'Ingresos' : 'Ganancia']
-}
+const formatTooltipArea = (value: any, name: any) => [formatCOP(Number(value)), name === 'ingresos' ? 'Ingresos' : 'Ganancia']
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const formatTooltipBar = (value: any) => [Number(value), 'Ventas']
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const formatTooltipPie = (value: any, name: any) => [String(value) + ' uds', String(name)]
 
+type Period = 'semana' | 'mes' | 'total'
+
+const PERIOD_LABELS: Record<Period, string> = {
+  semana: 'Esta semana',
+  mes: 'Este mes',
+  total: 'Todo el tiempo',
+}
+
 export default function DashboardPage() {
+  const [allSales, setAllSales] = useState<SaleData[]>([])
+  const [period, setPeriod] = useState<Period>('mes')
   const [stats, setStats] = useState<DashboardStats>({
     totalRevenue: 0, totalProfit: 0, totalSales: 0,
     stockQuantity: 0, totalClients: 0, essentialSales: 0, customSales: 0,
   })
-  const [salesData, setSalesData] = useState<SaleData[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -54,18 +61,12 @@ export default function DashboardPage() {
           supabase.from('inventory').select('quantity').eq('item_name', 'Tarjeta Negra Matte Base').single(),
           supabase.from('clients').select('id', { count: 'exact', head: true }),
         ])
-        const sales = salesRes.data ?? []
-        const completed = sales.filter(s => s.status === 'completada')
-        setSalesData(sales)
-        setStats({
-          totalRevenue: completed.reduce((acc, s) => acc + Number(s.total_revenue), 0),
-          totalProfit: completed.reduce((acc, s) => acc + Number(s.total_profit), 0),
-          totalSales: completed.length,
+        setAllSales(salesRes.data ?? [])
+        setStats(prev => ({
+          ...prev,
           stockQuantity: inventoryRes.data?.quantity ?? 0,
           totalClients: clientsRes.count ?? 0,
-          essentialSales: completed.filter(s => s.product_type === 'essential').length,
-          customSales: completed.filter(s => s.product_type === 'custom').length,
-        })
+        }))
       } finally {
         setLoading(false)
       }
@@ -73,12 +74,38 @@ export default function DashboardPage() {
     fetchStats()
   }, [])
 
-  // Ventas del mes actual
+  // Filtrar ventas según período
   const now = new Date()
+  const filteredSales = allSales.filter(s => {
+    if (s.status !== 'completada') return false
+    const saleDate = new Date(s.sale_date)
+    if (period === 'semana') {
+      const weekAgo = new Date(now)
+      weekAgo.setDate(weekAgo.getDate() - 7)
+      return saleDate >= weekAgo
+    }
+    if (period === 'mes') {
+      return saleDate.getMonth() === now.getMonth() && saleDate.getFullYear() === now.getFullYear()
+    }
+    return true
+  })
+
+  useEffect(() => {
+    const completed = filteredSales
+    setStats(prev => ({
+      ...prev,
+      totalRevenue: completed.reduce((acc, s) => acc + Number(s.total_revenue), 0),
+      totalProfit: completed.reduce((acc, s) => acc + Number(s.total_profit), 0),
+      totalSales: completed.length,
+      essentialSales: completed.filter(s => s.product_type === 'essential').length,
+      customSales: completed.filter(s => s.product_type === 'custom').length,
+    }))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allSales, period])
+
+  // Meta mensual — siempre usa el mes actual
   const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-  const monthSales = salesData.filter(s =>
-    s.sale_date.startsWith(currentMonthKey) && s.status === 'completada'
-  )
+  const monthSales = allSales.filter(s => s.sale_date.startsWith(currentMonthKey) && s.status === 'completada')
   const monthRevenue = monthSales.reduce((acc, s) => acc + Number(s.total_revenue), 0)
   const monthSalesCount = monthSales.length
 
@@ -87,7 +114,7 @@ export default function DashboardPage() {
     d.setDate(d.getDate() - (6 - i))
     const key = d.toISOString().split('T')[0]
     const label = d.toLocaleDateString('es-CO', { weekday: 'short', day: 'numeric' })
-    const daySales = salesData.filter(s => s.sale_date.startsWith(key) && s.status === 'completada')
+    const daySales = allSales.filter(s => s.sale_date.startsWith(key) && s.status === 'completada')
     return {
       dia: label,
       ingresos: daySales.reduce((acc, s) => acc + Number(s.total_revenue), 0),
@@ -102,23 +129,17 @@ export default function DashboardPage() {
   ].filter(d => d.value > 0)
 
   const kpis = [
-    { label: 'Ingresos Totales',     value: formatCOP(stats.totalRevenue),  icon: DollarSign,   color: '#00cfff', bg: '#00cfff0d', border: '#00cfff22' },
-    { label: 'Ganancia Neta',        value: formatCOP(stats.totalProfit),   icon: TrendingUp,   color: '#00ff94', bg: '#00ff940d', border: '#00ff9422' },
-    { label: 'Ventas Completadas',   value: String(stats.totalSales),       icon: ShoppingCart, color: '#00cfff', bg: '#00cfff0d', border: '#00cfff22' },
-    { label: 'Stock Disponible',     value: String(stats.stockQuantity),    icon: Package,
+    { label: 'Ingresos',          value: formatCOP(stats.totalRevenue),  icon: DollarSign,   color: '#00cfff', bg: '#00cfff0d', border: '#00cfff22' },
+    { label: 'Ganancia Neta',     value: formatCOP(stats.totalProfit),   icon: TrendingUp,   color: '#00ff94', bg: '#00ff940d', border: '#00ff9422' },
+    { label: 'Ventas',            value: String(stats.totalSales),       icon: ShoppingCart, color: '#00cfff', bg: '#00cfff0d', border: '#00cfff22' },
+    { label: 'Stock Disponible',  value: String(stats.stockQuantity),    icon: Package,
       color:  stats.stockQuantity < 5 ? '#ff4d4d' : '#00ff94',
       bg:     stats.stockQuantity < 5 ? '#ff4d4d0d' : '#00ff940d',
       border: stats.stockQuantity < 5 ? '#ff4d4d22' : '#00ff9422' },
-    { label: 'Clientes Registrados', value: String(stats.totalClients),     icon: Users,        color: '#00cfff', bg: '#00cfff0d', border: '#00cfff22' },
+    { label: 'Clientes',          value: String(stats.totalClients),     icon: Users,        color: '#00cfff', bg: '#00cfff0d', border: '#00cfff22' },
   ]
 
-  const tooltipStyle = {
-    backgroundColor: '#161616',
-    border: '1px solid #2a2a2a',
-    borderRadius: '10px',
-    color: '#f0f0f0',
-    fontSize: '13px',
-  }
+  const tooltipStyle = { backgroundColor: '#161616', border: '1px solid #2a2a2a', borderRadius: '10px', color: '#f0f0f0', fontSize: '13px' }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '40px' }}>
@@ -132,8 +153,21 @@ export default function DashboardPage() {
           </div>
           <p style={{ margin: 0, color: '#6b7280', fontSize: '14px' }}>Resumen general del negocio Taply NFC</p>
         </div>
-        <div style={{ padding: '8px 16px', borderRadius: '10px', backgroundColor: '#00ff940d', border: '1px solid #00ff9422', color: '#00ff94', fontSize: '12px', fontWeight: 600 }}>
-          ● Sistema Activo
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          {/* Selector de período */}
+          <div style={{ display: 'flex', gap: '4px', padding: '4px', borderRadius: '10px', backgroundColor: '#161616', border: '1px solid #1f1f1f' }}>
+            {(Object.keys(PERIOD_LABELS) as Period[]).map(p => (
+              <button key={p} onClick={() => setPeriod(p)}
+                style={{ padding: '6px 14px', borderRadius: '7px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', border: 'none',
+                  backgroundColor: period === p ? '#00cfff1a' : 'transparent',
+                  color: period === p ? '#00cfff' : '#6b7280' }}>
+                {PERIOD_LABELS[p]}
+              </button>
+            ))}
+          </div>
+          <div style={{ padding: '8px 16px', borderRadius: '10px', backgroundColor: '#00ff940d', border: '1px solid #00ff9422', color: '#00ff94', fontSize: '12px', fontWeight: 600 }}>
+            ● Sistema Activo
+          </div>
         </div>
       </div>
 
@@ -151,7 +185,7 @@ export default function DashboardPage() {
                 </div>
                 <div>
                   <p style={{ margin: 0, fontSize: '24px', fontWeight: 900, color }}>{value}</p>
-                  <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#6b7280' }}>{label}</p>
+                  <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#6b7280' }}>{label} · {PERIOD_LABELS[period]}</p>
                 </div>
               </div>
             ))
@@ -159,10 +193,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Meta mensual */}
-      <MonthlyGoal
-        currentRevenue={monthRevenue}
-        currentSales={monthSalesCount}
-      />
+      <MonthlyGoal currentRevenue={monthRevenue} currentSales={monthSalesCount} />
 
       {/* Gráfica de área */}
       <div style={{ borderRadius: '16px', padding: '28px', backgroundColor: '#161616', border: '1px solid #1f1f1f' }}>
@@ -223,22 +254,19 @@ export default function DashboardPage() {
 
         <div style={{ borderRadius: '16px', padding: '28px', backgroundColor: '#161616', border: '1px solid #1f1f1f' }}>
           <h2 style={{ margin: '0 0 24px', fontSize: '16px', fontWeight: 700, color: '#f0f0f0' }}>
-            Distribución por Producto
+            Distribución por Producto · {PERIOD_LABELS[period]}
           </h2>
           {loading ? (
             <div style={{ height: '200px', borderRadius: '10px', backgroundColor: '#0d0d0d' }} />
           ) : pieData.length === 0 ? (
             <div style={{ height: '200px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <p style={{ color: '#4b5563', fontSize: '14px' }}>Sin ventas aún</p>
+              <p style={{ color: '#4b5563', fontSize: '14px' }}>Sin ventas en este período</p>
             </div>
           ) : (
             <ResponsiveContainer width="100%" height={200}>
               <PieChart>
-                <Pie data={pieData} cx="50%" cy="50%" innerRadius={55} outerRadius={85}
-                  paddingAngle={4} dataKey="value">
-                  {pieData.map((entry, i) => (
-                    <Cell key={i} fill={entry.color} />
-                  ))}
+                <Pie data={pieData} cx="50%" cy="50%" innerRadius={55} outerRadius={85} paddingAngle={4} dataKey="value">
+                  {pieData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
                 </Pie>
                 <Tooltip contentStyle={tooltipStyle} formatter={formatTooltipPie} />
                 <Legend formatter={value => <span style={{ color: '#9ca3af', fontSize: '13px' }}>{value}</span>} />

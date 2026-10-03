@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase'
 import type { Sale } from '@/lib/supabase'
 import { PRODUCT_CONFIG } from '@/lib/supabase'
 import { formatCOP, formatDateTime, PAYMENT_METHOD_LABELS, SALE_STATUS_LABELS } from '@/lib/utils'
-import { ShoppingCart, Plus, X, Ban } from 'lucide-react'
+import { ShoppingCart, Plus, X, Ban, Clock, CheckCircle } from 'lucide-react'
 
 interface ClientBasic {
   id: string
@@ -23,6 +23,7 @@ export default function VentasPage() {
   const [cancellingId, setCancellingId] = useState<string | null>(null)
   const [stockQty, setStockQty] = useState(0)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [activeTab, setActiveTab] = useState<'todas' | 'pendientes'>('todas')
 
   const [form, setForm] = useState({
     client_id: '',
@@ -82,10 +83,19 @@ export default function VentasPage() {
     setCancellingId(saleId)
     const { error } = await supabase.from('sales').update({ status: 'cancelada' }).eq('id', saleId)
     if (error) { setMessage({ type: 'error', text: 'Error al cancelar la venta.' }) }
-    else { setMessage({ type: 'success', text: 'Venta cancelada y stock restaurado automáticamente.' }); fetchData() }
-    setCancellingId(null)
-    setConfirmCancel(null)
+    else { setMessage({ type: 'success', text: 'Venta cancelada y stock restaurado.' }); fetchData() }
+    setCancellingId(null); setConfirmCancel(null)
   }
+
+  async function handleMarkCompleted(saleId: string) {
+    const { error } = await supabase.from('sales').update({ status: 'completada' }).eq('id', saleId)
+    if (error) { setMessage({ type: 'error', text: 'Error al marcar como cobrada.' }) }
+    else { setMessage({ type: 'success', text: '¡Venta marcada como cobrada!' }); fetchData() }
+  }
+
+  const pendingSales = sales.filter(s => s.status === 'pendiente')
+  const pendingRevenue = pendingSales.reduce((acc, s) => acc + Number(s.total_revenue), 0)
+  const displaySales = activeTab === 'pendientes' ? pendingSales : sales
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
@@ -95,9 +105,14 @@ export default function VentasPage() {
         <div>
           <h1 style={{ margin: 0, fontSize: '32px', fontWeight: 900 }} className="taply-gradient-text">Ventas</h1>
           <p style={{ margin: '6px 0 0', fontSize: '14px', color: '#6b7280' }}>
-            {sales.length} venta{sales.length !== 1 ? 's' : ''} registrada{sales.length !== 1 ? 's' : ''}
+            {sales.filter(s => s.status === 'completada').length} completadas
             {' · '}
             <span style={{ color: stockQty < 5 ? '#ff4d4d' : '#00ff94' }}>Stock: {stockQty} uds</span>
+            {pendingSales.length > 0 && (
+              <span style={{ color: '#ffb547', marginLeft: '8px' }}>
+                · ⚠ {pendingSales.length} cobro{pendingSales.length !== 1 ? 's' : ''} pendiente{pendingSales.length !== 1 ? 's' : ''} ({formatCOP(pendingRevenue)})
+              </span>
+            )}
           </p>
         </div>
         <button onClick={() => { setShowForm(!showForm); setMessage(null) }}
@@ -108,6 +123,22 @@ export default function VentasPage() {
           {showForm ? 'Cancelar' : 'Nueva Venta'}
         </button>
       </div>
+
+      {/* Alerta de cobros pendientes */}
+      {pendingSales.length > 0 && activeTab === 'todas' && (
+        <div style={{ padding: '16px 20px', borderRadius: '12px', backgroundColor: '#ffb5470d', border: '1px solid #ffb54722', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <Clock size={18} style={{ color: '#ffb547' }} />
+            <span style={{ fontSize: '14px', color: '#ffb547', fontWeight: 600 }}>
+              Tienes {pendingSales.length} venta{pendingSales.length !== 1 ? 's' : ''} pendiente{pendingSales.length !== 1 ? 's' : ''} de cobro por {formatCOP(pendingRevenue)}
+            </span>
+          </div>
+          <button onClick={() => setActiveTab('pendientes')}
+            style={{ padding: '6px 16px', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', border: 'none', backgroundColor: '#ffb547', color: '#0d0d0d' }}>
+            Ver pendientes
+          </button>
+        </div>
+      )}
 
       {/* Formulario */}
       {showForm && (
@@ -162,7 +193,6 @@ export default function VentasPage() {
                 style={{ width: '100%', padding: '12px 16px', borderRadius: '10px', fontSize: '14px', outline: 'none', backgroundColor: '#0d0d0d', border: '1px solid #2a2a2a', color: '#f0f0f0', boxSizing: 'border-box' }} />
             </div>
           </div>
-
           <div style={{ marginTop: '24px', padding: '20px', borderRadius: '12px', backgroundColor: '#0d0d0d', border: '1px solid #1f1f1f', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
             {[
               { label: 'Ingreso',  value: formatCOP(totalRevenue), color: '#00cfff' },
@@ -175,7 +205,6 @@ export default function VentasPage() {
               </div>
             ))}
           </div>
-
           {message && showForm && (
             <div style={{ marginTop: '16px', padding: '12px 16px', borderRadius: '10px', fontSize: '14px',
               backgroundColor: message.type === 'success' ? '#00ff940d' : '#ff4d4d0d',
@@ -203,6 +232,18 @@ export default function VentasPage() {
         </div>
       )}
 
+      {/* Tabs */}
+      <div style={{ display: 'flex', gap: '4px', padding: '4px', borderRadius: '10px', backgroundColor: '#161616', border: '1px solid #1f1f1f', alignSelf: 'flex-start' }}>
+        {([['todas', 'Todas las ventas'], ['pendientes', `Cobros pendientes ${pendingSales.length > 0 ? `(${pendingSales.length})` : ''}`]] as const).map(([tab, label]) => (
+          <button key={tab} onClick={() => setActiveTab(tab)}
+            style={{ padding: '8px 20px', borderRadius: '7px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', border: 'none',
+              backgroundColor: activeTab === tab ? (tab === 'pendientes' ? '#ffb5470d' : '#00cfff0d') : 'transparent',
+              color: activeTab === tab ? (tab === 'pendientes' ? '#ffb547' : '#00cfff') : '#6b7280' }}>
+            {label}
+          </button>
+        ))}
+      </div>
+
       {/* Tabla */}
       <div style={{ borderRadius: '16px', overflow: 'hidden', border: '1px solid #1f1f1f' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
@@ -224,15 +265,15 @@ export default function VentasPage() {
                   ))}
                 </tr>
               ))
-            ) : sales.length === 0 ? (
+            ) : displaySales.length === 0 ? (
               <tr>
                 <td colSpan={9} style={{ padding: '48px', textAlign: 'center', color: '#4b5563' }}>
                   <ShoppingCart size={32} style={{ margin: '0 auto 12px', display: 'block', opacity: 0.3 }} />
-                  Aún no hay ventas registradas.
+                  {activeTab === 'pendientes' ? '¡No hay cobros pendientes!' : 'Aún no hay ventas registradas.'}
                 </td>
               </tr>
             ) : (
-              sales.map((sale, i) => {
+              displaySales.map((sale, i) => {
                 const clientData = sale.client as unknown as ClientBasic | null
                 return (
                   <tr key={sale.id} style={{ backgroundColor: i % 2 === 0 ? '#0d0d0d' : '#111111', borderBottom: '1px solid #161616', opacity: sale.status === 'cancelada' ? 0.5 : 1 }}>
@@ -251,21 +292,50 @@ export default function VentasPage() {
                       </span>
                     </td>
                     <td style={{ padding: '16px 20px' }}>
-                      {sale.status !== 'cancelada' ? (
+                      {sale.status === 'pendiente' ? (
+                        <div style={{ display: 'flex', gap: '6px' }}>
+                          <button onClick={() => handleMarkCompleted(sale.id)}
+                            title="Marcar como cobrada"
+                            style={{ padding: '6px', borderRadius: '8px', cursor: 'pointer', backgroundColor: '#00ff940d', border: '1px solid #00ff9422', color: '#00ff94', display: 'flex', alignItems: 'center' }}>
+                            <CheckCircle size={15} />
+                          </button>
+                          {confirmCancel === sale.id ? (
+                            <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                              <button onClick={() => handleCancel(sale.id)} disabled={cancellingId === sale.id}
+                                style={{ padding: '4px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', border: 'none', backgroundColor: '#ffb547', color: '#0d0d0d' }}>
+                                {cancellingId === sale.id ? '...' : 'Sí'}
+                              </button>
+                              <button onClick={() => setConfirmCancel(null)}
+                                style={{ padding: '4px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', border: '1px solid #2a2a2a', backgroundColor: 'transparent', color: '#6b7280' }}>
+                                No
+                              </button>
+                            </div>
+                          ) : (
+                            <button onClick={() => setConfirmCancel(sale.id)}
+                              title="Cancelar venta"
+                              style={{ padding: '6px', borderRadius: '8px', cursor: 'pointer', backgroundColor: 'transparent', border: '1px solid #1f1f1f', color: '#374151', display: 'flex', alignItems: 'center' }}
+                              onMouseEnter={e => { (e.currentTarget).style.backgroundColor = '#ffb5470d'; (e.currentTarget).style.color = '#ffb547' }}
+                              onMouseLeave={e => { (e.currentTarget).style.backgroundColor = 'transparent'; (e.currentTarget).style.color = '#374151' }}>
+                              <Ban size={15} />
+                            </button>
+                          )}
+                        </div>
+                      ) : sale.status === 'completada' ? (
                         confirmCancel === sale.id ? (
-                          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                             <span style={{ fontSize: '12px', color: '#ffb547' }}>¿Cancelar?</span>
                             <button onClick={() => handleCancel(sale.id)} disabled={cancellingId === sale.id}
-                              style={{ padding: '4px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', border: 'none', backgroundColor: '#ffb547', color: '#0d0d0d' }}>
+                              style={{ padding: '4px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', border: 'none', backgroundColor: '#ffb547', color: '#0d0d0d' }}>
                               {cancellingId === sale.id ? '...' : 'Sí'}
                             </button>
                             <button onClick={() => setConfirmCancel(null)}
-                              style={{ padding: '4px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', border: '1px solid #2a2a2a', backgroundColor: 'transparent', color: '#6b7280' }}>
+                              style={{ padding: '4px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', border: '1px solid #2a2a2a', backgroundColor: 'transparent', color: '#6b7280' }}>
                               No
                             </button>
                           </div>
                         ) : (
                           <button onClick={() => setConfirmCancel(sale.id)}
+                            title="Cancelar venta"
                             style={{ padding: '8px', borderRadius: '8px', cursor: 'pointer', backgroundColor: 'transparent', border: '1px solid #1f1f1f', color: '#374151', display: 'flex', alignItems: 'center' }}
                             onMouseEnter={e => { (e.currentTarget).style.backgroundColor = '#ffb5470d'; (e.currentTarget).style.borderColor = '#ffb54722'; (e.currentTarget).style.color = '#ffb547' }}
                             onMouseLeave={e => { (e.currentTarget).style.backgroundColor = 'transparent'; (e.currentTarget).style.borderColor = '#1f1f1f'; (e.currentTarget).style.color = '#374151' }}>

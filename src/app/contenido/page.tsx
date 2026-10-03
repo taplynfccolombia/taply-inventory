@@ -23,7 +23,6 @@ const FORMAT_CONFIG = {
   TikTok:   { color: '#00ff94', bg: '#00ff940d', border: '#00ff9422', emoji: '🎵' },
 }
 
-// Banco de ideas de contenido para Taply NFC
 const CONTENT_BANK = [
   { format: 'Reel', topic: 'Comparación tarjeta papel vs Taply NFC', caption_idea: 'Muestra cómo un cliente saca su tarjeta de papel arrugada vs un simple tap con Taply. El contraste lo dice todo.', hashtags: '#TaplyNFC #TarjetasNFC #NetworkingColombia #EmprendedoresColombia' },
   { format: 'Story', topic: 'Tutorial: cómo funciona el tap en 3 segundos', caption_idea: 'Muestra el proceso: acercar el teléfono → vibra → abre el perfil. Simple, rápido, profesional.', hashtags: '#NFC #TaplyNFC #TechColombia' },
@@ -53,7 +52,57 @@ const CONTENT_BANK = [
   { format: 'Story', topic: 'Oferta especial de la semana', caption_idea: 'Crea urgencia con una oferta limitada. Stories con cuenta regresiva generan conversiones directas.', hashtags: '#Oferta #TaplyNFC #Descuento #Colombia' },
   { format: 'Carrusel', topic: 'Comparativa: Taply vs otras tarjetas NFC del mercado', caption_idea: 'Precio, calidad, personalización, soporte. Muestra por qué Taply es la mejor opción en Colombia.', hashtags: '#Comparativa #NFC #TaplyNFC #MejorOpcion' },
   { format: 'TikTok', topic: 'Reacción honesta de alguien que nunca vio NFC', caption_idea: 'Busca a alguien que no conozca la tecnología y graba su reacción genuina. Contenido orgánico y viral.', hashtags: '#Reaccion #NFC #TaplyNFC #Viral' },
+  { format: 'Reel', topic: '¿Qué pasa cuando pierdes tu tarjeta de papel?', caption_idea: 'Dramatiza el momento de perder 200 tarjetas de papel vs perder tu Taply (spoiler: no pasa nada, tienes el digital).', hashtags: '#TaplyNFC #Networking #Profesional' },
+  { format: 'Story', topic: 'Cliente del mes: su historia con Taply', caption_idea: 'Destaca a un cliente real cada mes. Etiquétalo, genera comunidad y prueba social orgánica.', hashtags: '#ClienteDelMes #TaplyNFC #Comunidad' },
+  { format: 'Carrusel', topic: 'Guía: cómo sacar el máximo provecho a tu Taply', caption_idea: 'Tips de uso: perfil completo, foto profesional, links a redes, horarios, menú QR. Agrega valor post-venta.', hashtags: '#GuiaTaply #NFC #Tips #Profesional' },
+  { format: 'TikTok', topic: 'Proceso completo: del pedido a la entrega en 60 segundos', caption_idea: 'Time-lapse de todo el proceso. Muestra velocidad, cuidado y profesionalismo en cada paso.', hashtags: '#Proceso #TaplyNFC #Timelapse' },
+  { format: 'Reel', topic: 'Taply en el sector salud: médicos y psicólogos', caption_idea: 'Muestra cómo profesionales de la salud usan Taply para compartir su consultorio, horarios y WhatsApp.', hashtags: '#SaludNFC #TaplyNFC #MedicosColombia' },
+  { format: 'Story', topic: '¿Sabías que tu Taply funciona sin internet?', caption_idea: 'Mito vs realidad: el NFC no necesita internet para funcionar. Solo el teléfono del receptor lo necesita para abrir el link.', hashtags: '#MitoVsRealidad #NFC #TaplyNFC' },
+  { format: 'Carrusel', topic: 'Taply para el sector gastronómico', caption_idea: 'Restaurantes, chefs, servicios de catering. Muestra cómo comparten menú, reservas e Instagram con un solo tap.', hashtags: '#Gastronomia #NFC #TaplyNFC #Restaurantes' },
+  { format: 'TikTok', topic: 'Semana de networking: cuántos taps hice', caption_idea: 'Documenta una semana entera de eventos y cuenta cuántos contactos nuevos lograste con tu Taply.', hashtags: '#Networking #TaplyNFC #Contactos #Emprendimiento' },
+  { format: 'Reel', topic: 'NFC para inmobiliarias: así usan Taply los agentes', caption_idea: 'Un agente inmobiliario comparte su perfil con propiedades, fotos y WhatsApp con un tap. Cierra negocios más rápido.', hashtags: '#Inmobiliaria #NFC #TaplyNFC #BienesRaices' },
+  { format: 'Story', topic: '3 formas de usar tu Taply que no conocías', caption_idea: 'Como menú digital, como acceso a portafolio, como link a reservas. Más usos = más valor percibido.', hashtags: '#Tips #TaplyNFC #NFC #Usos' },
+  { format: 'Carrusel', topic: 'Taply Custom: proceso de diseño paso a paso', caption_idea: 'Diseño → aprobación → producción → entrega. Muestra el cuidado detrás de cada tarjeta personalizada.', hashtags: '#Diseño #Custom #TaplyNFC #ProcesoCreativo' },
+  { format: 'TikTok', topic: 'Duelo: tarjeta de papel vs Taply en velocidad', caption_idea: 'Cronometra cuánto tarda compartir datos con tarjeta de papel vs Taply. El resultado es obvio pero impactante.', hashtags: '#Duelo #TaplyNFC #Velocidad #Networking' },
 ]
+
+// Shuffle real usando crypto random
+function shuffleArray<T>(array: T[]): T[] {
+  const arr = [...array]
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]]
+  }
+  return arr
+}
+
+// Garantizar variedad de formatos: al menos 1 de cada tipo
+function selectBalancedWeek(bank: typeof CONTENT_BANK) {
+  const formats = ['Reel', 'Story', 'Carrusel', 'TikTok'] as const
+  const result: typeof CONTENT_BANK = []
+  const used = new Set<number>()
+
+  // Primero garantiza 1 de cada formato
+  for (const format of formats) {
+    const options = bank.map((item, idx) => ({ item, idx })).filter(({ item, idx }) => item.format === format && !used.has(idx))
+    const shuffled = shuffleArray(options)
+    if (shuffled.length > 0) {
+      result.push(shuffled[0].item)
+      used.add(shuffled[0].idx)
+    }
+  }
+
+  // Completa los 3 restantes con cualquier formato no usado
+  const remaining = bank.map((item, idx) => ({ item, idx })).filter(({ idx }) => !used.has(idx))
+  const shuffledRemaining = shuffleArray(remaining)
+  for (let i = 0; i < 3 && i < shuffledRemaining.length; i++) {
+    result.push(shuffledRemaining[i].item)
+    used.add(shuffledRemaining[i].idx)
+  }
+
+  // Mezcla el resultado final para que los días sean variados
+  return shuffleArray(result)
+}
 
 function getWeekStart(date: Date): Date {
   const d = new Date(date)
@@ -98,13 +147,8 @@ export default function ContenidoPage() {
   async function generateWeek() {
     setGenerating(true)
 
-    // Seleccionar 7 ideas únicas del banco según semana
-    const weekNum = Math.floor(new Date(weekStart).getTime() / (7 * 24 * 60 * 60 * 1000))
-    const shuffled = [...CONTENT_BANK].sort(() => {
-      const seed = weekNum * 7
-      return (seed % 3) - 1
-    })
-    const selected = shuffled.slice(0, 7)
+    // Seleccionar 7 ideas balanceadas y aleatorias
+    const selected = selectBalancedWeek(CONTENT_BANK)
 
     // Eliminar posts existentes de esta semana
     await supabase.from('content_board').delete().eq('week_start', weekStart)
@@ -152,9 +196,7 @@ export default function ContenidoPage() {
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
-          <h1 style={{ margin: 0, fontSize: '32px', fontWeight: 900 }} className="taply-gradient-text">
-            Contenido
-          </h1>
+          <h1 style={{ margin: 0, fontSize: '32px', fontWeight: 900 }} className="taply-gradient-text">Contenido</h1>
           <p style={{ margin: '6px 0 0', fontSize: '14px', color: '#6b7280' }}>
             Tablero de ideas para redes sociales de Taply NFC
           </p>
@@ -163,8 +205,8 @@ export default function ContenidoPage() {
           style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 20px', borderRadius: '12px', fontWeight: 700, fontSize: '14px', cursor: generating ? 'not-allowed' : 'pointer', border: 'none',
             background: generating ? '#2a2a2a' : 'linear-gradient(90deg, #00cfff, #00ff94)',
             color: generating ? '#6b7280' : '#0d0d0d' }}>
-          <RefreshCw size={16} style={{ animation: generating ? 'spin 1s linear infinite' : 'none' }} />
-          {generating ? 'Generando...' : posts.length > 0 ? 'Nueva Semana' : 'Generar Semana'}
+          <RefreshCw size={16} />
+          {generating ? 'Generando...' : posts.length > 0 ? '🎲 Regenerar Ideas' : 'Generar Semana'}
         </button>
       </div>
 
@@ -226,8 +268,6 @@ export default function ContenidoPage() {
                   border: `1px solid ${post.status === 'publicado' ? '#1f1f1f' : fc.border}`,
                   opacity: post.status === 'publicado' ? 0.7 : 1,
                   display: 'flex', flexDirection: 'column', gap: '12px' }}>
-
-                {/* Día */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ fontSize: '12px', fontWeight: 700, color: '#9ca3af' }}>{post.day_name}</span>
                   <button onClick={() => toggleStatus(post)}
@@ -237,24 +277,16 @@ export default function ContenidoPage() {
                     {post.status === 'publicado' && <Check size={12} style={{ color: '#00ff94' }} />}
                   </button>
                 </div>
-
-                {/* Formato */}
                 <span style={{ alignSelf: 'flex-start', padding: '3px 10px', borderRadius: '999px', fontSize: '11px', fontWeight: 700,
                   backgroundColor: fc.bg, color: fc.color, border: `1px solid ${fc.border}` }}>
                   {fc.emoji} {post.format}
                 </span>
-
-                {/* Tema */}
                 <p style={{ margin: 0, fontSize: '13px', fontWeight: 700, color: '#f0f0f0', lineHeight: '1.4' }}>
                   {post.topic}
                 </p>
-
-                {/* Idea de caption */}
                 <p style={{ margin: 0, fontSize: '11px', color: '#6b7280', lineHeight: '1.5', flex: 1 }}>
                   {post.caption_idea}
                 </p>
-
-                {/* Hashtags */}
                 <p style={{ margin: 0, fontSize: '10px', color: '#00cfff', lineHeight: '1.4', opacity: 0.7 }}>
                   {post.hashtags}
                 </p>
