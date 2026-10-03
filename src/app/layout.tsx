@@ -23,17 +23,16 @@ export const viewport: Viewport = {
   initialScale: 1,
 }
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
   return (
     <html lang="es">
       <body>
         <AuthGuard>
-          <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#0d0d0d' }}>
-            <Navbar />
-            <main className="main-content">
-              {children}
-            </main>
-          </div>
+          {children}
         </AuthGuard>
       </body>
     </html>
