@@ -30,7 +30,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <AuthGuard>
           <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#0d0d0d' }}>
             <Navbar />
-            <main style={{ flex: 1, padding: '40px', overflowX: 'hidden' }}>
+            <main style={{ flex: 1, padding: '40px', overflowX: 'hidden', maxWidth: '100vw' }}>
               {children}
             </main>
           </div>

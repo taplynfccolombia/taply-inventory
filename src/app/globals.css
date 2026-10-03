@@ -1,50 +1,16 @@
-@import "tailwindcss";
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-:root {
-  --background: #0d0d0d;
-  --foreground: #f0f0f0;
-  --card: #161616;
-  --card-border: #2a2a2a;
-  --cyan: #00cfff;
-  --green: #00ff94;
-  --cyan-dim: #00cfff33;
-  --green-dim: #00ff9433;
-  --muted: #6b7280;
-  --muted-fg: #9ca3af;
-  --danger: #ff4d4d;
-  --warning: #ffb547;
-  --success: #00ff94;
-}
-
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
-
-body {
-  background-color: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
+html, body {
+  background-color: #0d0d0d;
+  color: #f0f0f0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
 }
 
-/* Scrollbar personalizada */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-::-webkit-scrollbar-track {
-  background: #161616;
-}
-::-webkit-scrollbar-thumb {
-  background: #2a2a2a;
-  border-radius: 3px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #00cfff55;
-}
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #111111; }
+::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 3px; }
 
 /* Gradiente de texto Taply */
 .taply-gradient-text {
@@ -54,29 +20,63 @@ body {
   background-clip: text;
 }
 
-/* Gradiente de borde Taply */
-.taply-gradient-border {
-  border: 1px solid transparent;
-  background-clip: padding-box;
-  position: relative;
-}
-.taply-gradient-border::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  padding: 1px;
-  background: linear-gradient(135deg, #00cfff, #00ff94);
-  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  pointer-events: none;
+/* Inputs y selects globales */
+input, select, textarea {
+  font-family: inherit;
 }
 
-/* Glow cyan */
-.glow-cyan {
-  box-shadow: 0 0 20px #00cfff33;
+/* ── RESPONSIVE MÓVIL ─────────────────────────────── */
+@media (max-width: 768px) {
+
+  /* Layout principal */
+  main {
+    margin-left: 0 !important;
+    padding: 16px !important;
+    padding-bottom: 80px !important;
+  }
+
+  /* Títulos */
+  h1 { font-size: 24px !important; }
+  h2 { font-size: 18px !important; }
+  h3 { font-size: 15px !important; }
+
+  /* Grids adaptables */
+  .grid-5 { grid-template-columns: 1fr 1fr !important; }
+  .grid-4 { grid-template-columns: 1fr 1fr !important; }
+  .grid-3 { grid-template-columns: 1fr !important; }
+  .grid-2 { grid-template-columns: 1fr !important; }
+
+  /* Tablas horizontales */
+  .table-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Ocultar columnas opcionales en móvil */
+  .hide-mobile { display: none !important; }
+
+  /* Botones más grandes para touch */
+  button { min-height: 40px; }
+
+  /* Cards con menos padding */
+  .card-mobile { padding: 16px !important; }
 }
-.glow-green {
-  box-shadow: 0 0 20px #00ff9433;
+
+/* ── RESPONSIVE TABLET ────────────────────────────── */
+@media (max-width: 1024px) and (min-width: 769px) {
+  .grid-5 { grid-template-columns: repeat(3, 1fr) !important; }
+  .grid-4 { grid-template-columns: 1fr 1fr !important; }
+}
+
+/* ── Botones de sesión en móvil ───────────────────── */
+@media (max-width: 768px) {
+  .session-buttons {
+    bottom: 8px !important;
+    right: 8px !important;
+    gap: 4px !important;
+  }
+  .session-buttons button {
+    padding: 6px 10px !important;
+    font-size: 11px !important;
+  }
 }
