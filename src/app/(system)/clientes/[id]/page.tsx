@@ -1,40 +1,29 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import type { Client, Sale } from '@/lib/supabase'
 import { PRODUCT_CONFIG } from '@/lib/supabase'
 import { formatCOP, formatDate, formatDateTime, PAYMENT_METHOD_LABELS, SALE_STATUS_LABELS, generateWhatsAppLink, whatsAppSeguimientoMessage, whatsAppVentaMessage } from '@/lib/utils'
 import { useIsMobile } from '@/lib/hooks'
-import { ArrowLeft, User, ShoppingCart, TrendingUp, DollarSign, Ban, MessageCircle, Pencil, Check, X, Zap, Plus, Trash2, ExternalLink, Eye } from 'lucide-react'
+import { ArrowLeft, User, ShoppingCart, TrendingUp, DollarSign, Ban, MessageCircle, Pencil, Check, X, Zap, Plus, Trash2, ExternalLink, Eye, Upload, Image } from 'lucide-react'
 
 interface CustomLink { label: string; url: string; icon: string }
 
 interface NFCProfile {
-  id: string
-  slug: string
-  display_name: string
-  tagline: string | null
-  company: string | null
-  avatar_url: string | null
-  whatsapp: string | null
-  email: string | null
-  website: string | null
-  instagram: string | null
-  tiktok: string | null
-  linkedin: string | null
-  facebook: string | null
-  youtube: string | null
-  custom_links: CustomLink[]
-  is_active: boolean
-  views: number
+  id: string; slug: string; display_name: string; tagline: string | null
+  company: string | null; avatar_url: string | null; whatsapp: string | null
+  email: string | null; website: string | null; instagram: string | null
+  tiktok: string | null; linkedin: string | null; facebook: string | null
+  youtube: string | null; custom_links: CustomLink[]; is_active: boolean; views: number
 }
 
 export default function ClienteDetallePage() {
   const { id } = useParams()
   const router = useRouter()
   const isMobile = useIsMobile()
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const [client, setClient] = useState<Client | null>(null)
   const [sales, setSales] = useState<Sale[]>([])
   const [loading, setLoading] = useState(true)
@@ -45,10 +34,10 @@ export default function ClienteDetallePage() {
   const [saving, setSaving] = useState(false)
   const [editForm, setEditForm] = useState({ full_name: '', email: '', phone: '', company: '', city: '', notes: '' })
 
-  // NFC Profile
   const [nfcProfile, setNfcProfile] = useState<NFCProfile | null>(null)
   const [showNFCForm, setShowNFCForm] = useState(false)
   const [savingNFC, setSavingNFC] = useState(false)
+  const [uploadingImage, setUploadingImage] = useState(false)
   const [nfcMessage, setNfcMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [nfcForm, setNfcForm] = useState({
     slug: '', display_name: '', tagline: '', company: '', avatar_url: '',
@@ -57,6 +46,7 @@ export default function ClienteDetallePage() {
   })
   const [customLinks, setCustomLinks] = useState<CustomLink[]>([])
   const [newLink, setNewLink] = useState({ label: '', url: '', icon: '🔗' })
+  const [previewAvatar, setPreviewAvatar] = useState<string | null>(null)
 
   async function fetchData() {
     const [clientRes, salesRes, nfcRes] = await Promise.all([
@@ -69,22 +59,16 @@ export default function ClienteDetallePage() {
     if (nfcRes.data) {
       setNfcProfile(nfcRes.data)
       setNfcForm({
-        slug: nfcRes.data.slug ?? '',
-        display_name: nfcRes.data.display_name ?? '',
-        tagline: nfcRes.data.tagline ?? '',
-        company: nfcRes.data.company ?? '',
-        avatar_url: nfcRes.data.avatar_url ?? '',
-        whatsapp: nfcRes.data.whatsapp ?? '',
-        email: nfcRes.data.email ?? '',
-        website: nfcRes.data.website ?? '',
-        instagram: nfcRes.data.instagram ?? '',
-        tiktok: nfcRes.data.tiktok ?? '',
-        linkedin: nfcRes.data.linkedin ?? '',
-        facebook: nfcRes.data.facebook ?? '',
-        youtube: nfcRes.data.youtube ?? '',
-        is_active: nfcRes.data.is_active ?? true,
+        slug: nfcRes.data.slug ?? '', display_name: nfcRes.data.display_name ?? '',
+        tagline: nfcRes.data.tagline ?? '', company: nfcRes.data.company ?? '',
+        avatar_url: nfcRes.data.avatar_url ?? '', whatsapp: nfcRes.data.whatsapp ?? '',
+        email: nfcRes.data.email ?? '', website: nfcRes.data.website ?? '',
+        instagram: nfcRes.data.instagram ?? '', tiktok: nfcRes.data.tiktok ?? '',
+        linkedin: nfcRes.data.linkedin ?? '', facebook: nfcRes.data.facebook ?? '',
+        youtube: nfcRes.data.youtube ?? '', is_active: nfcRes.data.is_active ?? true,
       })
       setCustomLinks(Array.isArray(nfcRes.data.custom_links) ? nfcRes.data.custom_links : [])
+      setPreviewAvatar(nfcRes.data.avatar_url ?? null)
     }
     if (clientRes.data) {
       setEditForm({ full_name: clientRes.data.full_name ?? '', email: clientRes.data.email ?? '', phone: clientRes.data.phone ?? '', company: clientRes.data.company ?? '', city: clientRes.data.city ?? '', notes: clientRes.data.notes ?? '' })
@@ -93,6 +77,22 @@ export default function ClienteDetallePage() {
   }
 
   useEffect(() => { fetchData() }, [id])
+
+  async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (file.size > 2 * 1024 * 1024) { setNfcMessage({ type: 'error', text: 'La imagen debe ser menor a 2MB.' }); return }
+    setUploadingImage(true); setNfcMessage(null)
+    const ext = file.name.split('.').pop()
+    const fileName = `${id}-${Date.now()}.${ext}`
+    const { error: uploadError } = await supabase.storage.from('nfc-avatars').upload(fileName, file, { upsert: true })
+    if (uploadError) { setNfcMessage({ type: 'error', text: `Error al subir: ${uploadError.message}` }); setUploadingImage(false); return }
+    const { data: { publicUrl } } = supabase.storage.from('nfc-avatars').getPublicUrl(fileName)
+    setNfcForm(p => ({ ...p, avatar_url: publicUrl }))
+    setPreviewAvatar(publicUrl)
+    setNfcMessage({ type: 'success', text: '✅ Imagen subida correctamente.' })
+    setUploadingImage(false)
+  }
 
   async function handleSaveEdit() {
     if (!editForm.full_name.trim()) { setMessage({ type: 'error', text: 'El nombre es obligatorio.' }); return }
@@ -121,22 +121,13 @@ export default function ClienteDetallePage() {
     const slugClean = generateSlug(nfcForm.slug)
     setSavingNFC(true); setNfcMessage(null)
     const payload = {
-      client_id: id,
-      slug: slugClean,
-      display_name: nfcForm.display_name.trim(),
-      tagline: nfcForm.tagline.trim() || null,
-      company: nfcForm.company.trim() || null,
-      avatar_url: nfcForm.avatar_url.trim() || null,
-      whatsapp: nfcForm.whatsapp.trim() || null,
-      email: nfcForm.email.trim() || null,
-      website: nfcForm.website.trim() || null,
-      instagram: nfcForm.instagram.trim() || null,
-      tiktok: nfcForm.tiktok.trim() || null,
-      linkedin: nfcForm.linkedin.trim() || null,
-      facebook: nfcForm.facebook.trim() || null,
-      youtube: nfcForm.youtube.trim() || null,
-      custom_links: customLinks,
-      is_active: nfcForm.is_active,
+      client_id: id, slug: slugClean, display_name: nfcForm.display_name.trim(),
+      tagline: nfcForm.tagline.trim() || null, company: nfcForm.company.trim() || null,
+      avatar_url: nfcForm.avatar_url.trim() || null, whatsapp: nfcForm.whatsapp.trim() || null,
+      email: nfcForm.email.trim() || null, website: nfcForm.website.trim() || null,
+      instagram: nfcForm.instagram.trim() || null, tiktok: nfcForm.tiktok.trim() || null,
+      linkedin: nfcForm.linkedin.trim() || null, facebook: nfcForm.facebook.trim() || null,
+      youtube: nfcForm.youtube.trim() || null, custom_links: customLinks, is_active: nfcForm.is_active,
     }
     let error
     if (nfcProfile) {
@@ -157,9 +148,7 @@ export default function ClienteDetallePage() {
     setNewLink({ label: '', url: '', icon: '🔗' })
   }
 
-  function removeCustomLink(i: number) {
-    setCustomLinks(prev => prev.filter((_, idx) => idx !== i))
-  }
+  function removeCustomLink(i: number) { setCustomLinks(prev => prev.filter((_, idx) => idx !== i)) }
 
   const completedSales = sales.filter(s => s.status === 'completada')
   const totalRevenue = completedSales.reduce((acc, s) => acc + Number(s.total_revenue), 0)
@@ -220,7 +209,7 @@ export default function ClienteDetallePage() {
         </div>
       </div>
 
-      {/* Formulario edición cliente */}
+      {/* Formulario edición */}
       {editing && (
         <div style={{ borderRadius: '14px', padding: '20px', backgroundColor: '#161616', border: '1px solid #00cfff22', display: 'flex', flexDirection: 'column', gap: '12px' }}>
           <h2 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: '#00cfff' }}>✏️ Editar cliente</h2>
@@ -279,10 +268,7 @@ export default function ClienteDetallePage() {
       {/* Desglose */}
       {completedSales.length > 0 && (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-          {[
-            { label: 'Taply Essential', count: essentialCount, color: '#00cfff', bg: '#00cfff0d', border: '#00cfff22' },
-            { label: 'Taply Custom', count: customCount, color: '#00ff94', bg: '#00ff940d', border: '#00ff9422' },
-          ].map(({ label, count, color, bg, border }) => (
+          {[{ label: 'Taply Essential', count: essentialCount, color: '#00cfff', bg: '#00cfff0d', border: '#00cfff22' }, { label: 'Taply Custom', count: customCount, color: '#00ff94', bg: '#00ff940d', border: '#00ff9422' }].map(({ label, count, color, bg, border }) => (
             <div key={label} style={{ borderRadius: '12px', padding: '14px 16px', backgroundColor: bg, border: `1px solid ${border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <span style={{ fontSize: '13px', fontWeight: 600, color: '#f0f0f0' }}>{label}</span>
               <span style={{ fontSize: '24px', fontWeight: 900, color }}>{count}</span>
@@ -295,7 +281,11 @@ export default function ClienteDetallePage() {
       <div style={{ borderRadius: '16px', overflow: 'hidden', border: nfcProfile ? '1px solid #00cfff22' : '1px dashed #2a2a2a' }}>
         <div style={{ padding: '18px 20px', backgroundColor: nfcProfile ? '#00cfff0d' : '#161616', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <Zap size={18} style={{ color: '#00cfff' }} />
+            {nfcProfile?.avatar_url ? (
+              <img src={nfcProfile.avatar_url} alt={nfcProfile.display_name} style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #00cfff33' }} />
+            ) : (
+              <Zap size={18} style={{ color: '#00cfff' }} />
+            )}
             <div>
               <h2 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: '#f0f0f0' }}>Perfil NFC</h2>
               <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#6b7280' }}>
@@ -323,9 +313,37 @@ export default function ClienteDetallePage() {
           </div>
         </div>
 
-        {/* Formulario NFC */}
         {showNFCForm && (
           <div style={{ padding: '20px', backgroundColor: '#0d0d0d', borderTop: '1px solid #1f1f1f', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+
+            {/* Upload de imagen */}
+            <div style={{ borderRadius: '12px', padding: '16px', backgroundColor: '#161616', border: '1px solid #1f1f1f' }}>
+              <p style={{ margin: '0 0 12px', fontSize: '12px', fontWeight: 700, color: '#9ca3af' }}>📸 Logo o foto del perfil</p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+                <div style={{ width: '72px', height: '72px', borderRadius: '50%', border: '2px solid #00cfff33', backgroundColor: '#0d0d0d', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 }}>
+                  {previewAvatar ? (
+                    <img src={previewAvatar} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : (
+                    <Image size={24} style={{ color: '#374151' }} />
+                  )}
+                </div>
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageUpload} style={{ display: 'none' }} />
+                  <button onClick={() => fileInputRef.current?.click()} disabled={uploadingImage}
+                    style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: uploadingImage ? 'not-allowed' : 'pointer', backgroundColor: '#00cfff0d', border: '1px solid #00cfff33', color: '#00cfff' }}>
+                    <Upload size={14} />
+                    {uploadingImage ? 'Subiendo...' : previewAvatar ? 'Cambiar imagen' : 'Subir imagen'}
+                  </button>
+                  <p style={{ margin: 0, fontSize: '11px', color: '#4b5563' }}>PNG, JPG o WebP · Máx. 2MB · Se recomienda cuadrada</p>
+                  {previewAvatar && (
+                    <button onClick={() => { setPreviewAvatar(null); setNfcForm(p => ({ ...p, avatar_url: '' })) }}
+                      style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '5px 10px', borderRadius: '8px', fontSize: '11px', fontWeight: 600, cursor: 'pointer', backgroundColor: 'transparent', border: '1px solid #ff4d4d22', color: '#ff4d4d', alignSelf: 'flex-start' }}>
+                      <X size={11} /> Quitar imagen
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '12px' }}>
               <div>
@@ -337,7 +355,7 @@ export default function ClienteDetallePage() {
               <div>
                 <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#9ca3af', marginBottom: '6px' }}>Slug (URL única) *</label>
                 <div style={{ position: 'relative' }}>
-                  <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', fontSize: '11px', color: '#4b5563', whiteSpace: 'nowrap' }}>/p/</span>
+                  <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', fontSize: '11px', color: '#4b5563' }}>/p/</span>
                   <input type="text" value={nfcForm.slug} onChange={e => setNfcForm(p => ({ ...p, slug: generateSlug(e.target.value) }))}
                     placeholder="juan-garcia"
                     style={{ width: '100%', padding: '10px 12px 10px 32px', borderRadius: '10px', fontSize: '13px', outline: 'none', backgroundColor: '#161616', border: '1px solid #00cfff33', color: '#00cfff', boxSizing: 'border-box' }} />
@@ -345,26 +363,18 @@ export default function ClienteDetallePage() {
               </div>
               <div>
                 <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#9ca3af', marginBottom: '6px' }}>Tagline / Cargo</label>
-                <input type="text" value={nfcForm.tagline} onChange={e => setNfcForm(p => ({ ...p, tagline: e.target.value }))}
-                  placeholder="Ej: Diseñador Gráfico · Bogotá"
+                <input type="text" value={nfcForm.tagline} onChange={e => setNfcForm(p => ({ ...p, tagline: e.target.value }))} placeholder="Ej: Diseñador Gráfico · Bogotá"
                   style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', fontSize: '13px', outline: 'none', backgroundColor: '#161616', border: '1px solid #2a2a2a', color: '#f0f0f0', boxSizing: 'border-box' }} />
               </div>
               <div>
                 <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#9ca3af', marginBottom: '6px' }}>Empresa</label>
-                <input type="text" value={nfcForm.company} onChange={e => setNfcForm(p => ({ ...p, company: e.target.value }))}
-                  placeholder="Nombre de la empresa"
-                  style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', fontSize: '13px', outline: 'none', backgroundColor: '#161616', border: '1px solid #2a2a2a', color: '#f0f0f0', boxSizing: 'border-box' }} />
-              </div>
-              <div style={{ gridColumn: isMobile ? '1' : 'span 2' }}>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#9ca3af', marginBottom: '6px' }}>URL de foto / logo (opcional)</label>
-                <input type="text" value={nfcForm.avatar_url} onChange={e => setNfcForm(p => ({ ...p, avatar_url: e.target.value }))}
-                  placeholder="https://... (link directo a imagen)"
+                <input type="text" value={nfcForm.company} onChange={e => setNfcForm(p => ({ ...p, company: e.target.value }))} placeholder="Nombre de la empresa"
                   style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', fontSize: '13px', outline: 'none', backgroundColor: '#161616', border: '1px solid #2a2a2a', color: '#f0f0f0', boxSizing: 'border-box' }} />
               </div>
             </div>
 
             <div style={{ borderRadius: '12px', padding: '16px', backgroundColor: '#161616', border: '1px solid #1f1f1f' }}>
-              <p style={{ margin: '0 0 12px', fontSize: '12px', fontWeight: 700, color: '#9ca3af' }}>📱 Links del perfil — solo llena los que el cliente quiera</p>
+              <p style={{ margin: '0 0 12px', fontSize: '12px', fontWeight: 700, color: '#9ca3af' }}>📱 Links del perfil</p>
               <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '10px' }}>
                 {[
                   { key: 'whatsapp', label: '💬 WhatsApp', placeholder: '3001234567' },
@@ -387,14 +397,13 @@ export default function ClienteDetallePage() {
 
             {/* Links personalizados */}
             <div style={{ borderRadius: '12px', padding: '16px', backgroundColor: '#161616', border: '1px solid #1f1f1f' }}>
-              <p style={{ margin: '0 0 12px', fontSize: '12px', fontWeight: 700, color: '#9ca3af' }}>🔗 Links personalizados (opcionales)</p>
+              <p style={{ margin: '0 0 12px', fontSize: '12px', fontWeight: 700, color: '#9ca3af' }}>🔗 Links personalizados</p>
               {customLinks.map((link, i) => (
                 <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', padding: '10px 12px', borderRadius: '9px', backgroundColor: '#0d0d0d', border: '1px solid #2a2a2a' }}>
                   <span style={{ fontSize: '16px' }}>{link.icon}</span>
                   <span style={{ flex: 1, fontSize: '12px', color: '#f0f0f0', fontWeight: 600 }}>{link.label}</span>
-                  <span style={{ fontSize: '11px', color: '#6b7280' }}>{link.url.substring(0, 30)}{link.url.length > 30 ? '...' : ''}</span>
-                  <button onClick={() => removeCustomLink(i)}
-                    style={{ padding: '4px', borderRadius: '6px', cursor: 'pointer', backgroundColor: 'transparent', border: 'none', color: '#ff4d4d', display: 'flex', alignItems: 'center' }}>
+                  <span style={{ fontSize: '11px', color: '#6b7280' }}>{link.url.substring(0, 25)}{link.url.length > 25 ? '...' : ''}</span>
+                  <button onClick={() => removeCustomLink(i)} style={{ padding: '4px', borderRadius: '6px', cursor: 'pointer', backgroundColor: 'transparent', border: 'none', color: '#ff4d4d', display: 'flex', alignItems: 'center' }}>
                     <Trash2 size={13} />
                   </button>
                 </div>
@@ -416,13 +425,13 @@ export default function ClienteDetallePage() {
                     style={{ width: '100%', padding: '9px 11px', borderRadius: '9px', fontSize: '14px', outline: 'none', backgroundColor: '#0d0d0d', border: '1px solid #2a2a2a', color: '#f0f0f0', boxSizing: 'border-box', textAlign: 'center' }} />
                 </div>
                 <button onClick={addCustomLink} disabled={!newLink.label.trim() || !newLink.url.trim()}
-                  style={{ padding: '9px 14px', borderRadius: '9px', fontWeight: 700, fontSize: '13px', cursor: 'pointer', border: 'none', background: 'linear-gradient(90deg, #00cfff, #00ff94)', color: '#0d0d0d', whiteSpace: 'nowrap' }}>
+                  style={{ padding: '9px 14px', borderRadius: '9px', fontWeight: 700, fontSize: '13px', cursor: 'pointer', border: 'none', background: 'linear-gradient(90deg, #00cfff, #00ff94)', color: '#0d0d0d' }}>
                   <Plus size={14} />
                 </button>
               </div>
             </div>
 
-            {/* Activo/Inactivo */}
+            {/* Toggle activo */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px', borderRadius: '12px', backgroundColor: '#161616', border: '1px solid #1f1f1f' }}>
               <button onClick={() => setNfcForm(p => ({ ...p, is_active: !p.is_active }))}
                 style={{ width: '44px', height: '24px', borderRadius: '999px', cursor: 'pointer', border: 'none', position: 'relative', backgroundColor: nfcForm.is_active ? '#00ff94' : '#2a2a2a', transition: 'background-color 0.2s ease', flexShrink: 0 }}>
@@ -430,7 +439,7 @@ export default function ClienteDetallePage() {
               </button>
               <div>
                 <p style={{ margin: 0, fontSize: '13px', fontWeight: 600, color: nfcForm.is_active ? '#00ff94' : '#6b7280' }}>{nfcForm.is_active ? 'Perfil activo' : 'Perfil inactivo'}</p>
-                <p style={{ margin: '2px 0 0', fontSize: '11px', color: '#4b5563' }}>{nfcForm.is_active ? 'El perfil es visible públicamente' : 'El perfil no es visible'}</p>
+                <p style={{ margin: '2px 0 0', fontSize: '11px', color: '#4b5563' }}>{nfcForm.is_active ? 'Visible públicamente' : 'No visible'}</p>
               </div>
             </div>
 
