@@ -4,13 +4,15 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { CashFlow } from '@/lib/supabase'
 import { formatCOP, formatDateTime, CASH_FLOW_CATEGORY_LABELS, PAYMENT_METHOD_LABELS, exportToCSV } from '@/lib/utils'
-import { Wallet, Plus, X, TrendingUp, TrendingDown, Download } from 'lucide-react'
+import { Wallet, Plus, X, TrendingUp, TrendingDown, Download, Calendar } from 'lucide-react'
 
 interface SaleByPayment {
   payment_method: string
   total: number
   count: number
 }
+
+type PeriodFilter = 'todo' | 'mes' | 'semana' | 'personalizado'
 
 export default function FlujoCajaPage() {
   const [flows, setFlows] = useState<CashFlow[]>([])
@@ -19,6 +21,9 @@ export default function FlujoCajaPage() {
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [periodFilter, setPeriodFilter] = useState<PeriodFilter>('todo')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
 
   const [form, setForm] = useState({
     type: 'egreso' as 'ingreso' | 'egreso',
@@ -27,12 +32,39 @@ export default function FlujoCajaPage() {
     amount: '',
   })
 
+  function getDateRange(p: PeriodFilter): { from: string; to: string } | null {
+    const now = new Date()
+    if (p === 'semana') {
+      const from = new Date(now); from.setDate(from.getDate() - 7)
+      return { from: from.toISOString(), to: now.toISOString() }
+    }
+    if (p === 'mes') {
+      const from = new Date(now.getFullYear(), now.getMonth(), 1)
+      return { from: from.toISOString(), to: now.toISOString() }
+    }
+    if (p === 'personalizado' && dateFrom && dateTo) {
+      return { from: `${dateFrom}T00:00:00`, to: `${dateTo}T23:59:59` }
+    }
+    return null
+  }
+
   async function fetchData() {
-    const [flowsRes, salesRes] = await Promise.all([
-      supabase.from('cash_flow').select('*').order('flow_date', { ascending: false }),
-      supabase.from('sales').select('payment_method, total_revenue').eq('status', 'completada'),
-    ])
+    setLoading(true)
+    const range = getDateRange(periodFilter)
+
+    let flowsQuery = supabase.from('cash_flow').select('*').order('flow_date', { ascending: false })
+    if (range) {
+      flowsQuery = flowsQuery.gte('flow_date', range.from).lte('flow_date', range.to)
+    }
+
+    let salesQuery = supabase.from('sales').select('payment_method, total_revenue').eq('status', 'completada')
+    if (range) {
+      salesQuery = salesQuery.gte('sale_date', range.from).lte('sale_date', range.to)
+    }
+
+    const [flowsRes, salesRes] = await Promise.all([flowsQuery, salesQuery])
     setFlows(flowsRes.data ?? [])
+
     const salesData = salesRes.data ?? []
     const grouped: Record<string, { total: number; count: number }> = {}
     salesData.forEach(s => {
@@ -44,7 +76,7 @@ export default function FlujoCajaPage() {
     setLoading(false)
   }
 
-  useEffect(() => { fetchData() }, [])
+  useEffect(() => { fetchData() }, [periodFilter, dateFrom, dateTo])
 
   const totalIngresos = flows.filter(f => f.type === 'ingreso').reduce((acc, f) => acc + Number(f.amount), 0)
   const totalEgresos = flows.filter(f => f.type === 'egreso').reduce((acc, f) => acc + Number(f.amount), 0)
@@ -92,6 +124,13 @@ export default function FlujoCajaPage() {
   }
   const totalVentas = salesByPayment.reduce((acc, s) => acc + s.total, 0)
 
+  const PERIOD_LABELS: Record<PeriodFilter, string> = {
+    todo: 'Todo el tiempo',
+    mes: 'Este mes',
+    semana: 'Esta semana',
+    personalizado: 'Personalizado',
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
 
@@ -116,6 +155,35 @@ export default function FlujoCajaPage() {
         </div>
       </div>
 
+      {/* Selector de período */}
+      <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: '4px', padding: '4px', borderRadius: '10px', backgroundColor: '#161616', border: '1px solid #1f1f1f' }}>
+          {(['todo', 'mes', 'semana', 'personalizado'] as PeriodFilter[]).map(p => (
+            <button key={p} onClick={() => setPeriodFilter(p)}
+              style={{ padding: '8px 14px', borderRadius: '7px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', border: 'none',
+                backgroundColor: periodFilter === p ? '#00cfff0d' : 'transparent',
+                color: periodFilter === p ? '#00cfff' : '#6b7280' }}>
+              {PERIOD_LABELS[p]}
+            </button>
+          ))}
+        </div>
+        {periodFilter === 'personalizado' && (
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <Calendar size={14} style={{ color: '#6b7280' }} />
+            <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
+              style={{ padding: '8px 12px', borderRadius: '8px', fontSize: '12px', outline: 'none', backgroundColor: '#161616', border: '1px solid #2a2a2a', color: '#f0f0f0' }} />
+            <span style={{ color: '#6b7280', fontSize: '12px' }}>—</span>
+            <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
+              style={{ padding: '8px 12px', borderRadius: '8px', fontSize: '12px', outline: 'none', backgroundColor: '#161616', border: '1px solid #2a2a2a', color: '#f0f0f0' }} />
+          </div>
+        )}
+        {periodFilter !== 'todo' && (
+          <span style={{ fontSize: '12px', color: '#6b7280' }}>
+            {flows.length} movimiento{flows.length !== 1 ? 's' : ''} en el período
+          </span>
+        )}
+      </div>
+
       {/* KPI Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '20px' }}>
         {[
@@ -132,6 +200,7 @@ export default function FlujoCajaPage() {
               <span style={{ fontSize: '13px', color: '#9ca3af' }}>{label}</span>
             </div>
             <p style={{ margin: 0, fontSize: '32px', fontWeight: 900, color }}>{value}</p>
+            <p style={{ margin: '4px 0 0', fontSize: '11px', color: '#374151' }}>{PERIOD_LABELS[periodFilter]}</p>
           </div>
         ))}
       </div>
@@ -139,7 +208,10 @@ export default function FlujoCajaPage() {
       {/* Desglose por medio de pago */}
       {salesByPayment.length > 0 && (
         <div style={{ borderRadius: '16px', padding: '24px', backgroundColor: '#161616', border: '1px solid #1f1f1f' }}>
-          <h2 style={{ margin: '0 0 20px', fontSize: '16px', fontWeight: 700, color: '#f0f0f0' }}>💳 Ingresos por Medio de Pago</h2>
+          <h2 style={{ margin: '0 0 20px', fontSize: '16px', fontWeight: 700, color: '#f0f0f0' }}>
+            💳 Ingresos por Medio de Pago
+            <span style={{ fontSize: '12px', color: '#6b7280', fontWeight: 400, marginLeft: '8px' }}>· {PERIOD_LABELS[periodFilter]}</span>
+          </h2>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '12px' }}>
             {['efectivo', 'transferencia', 'nequi', 'daviplata', 'otro'].map(method => {
               const data = salesByPayment.find(s => s.payment_method === method)
@@ -232,7 +304,7 @@ export default function FlujoCajaPage() {
           <tbody>
             {loading ? (
               [...Array(3)].map((_, i) => (
-                <tr key={i} style={{ borderBottom: '1px solid #161616' }}>
+                <tr key={i}>
                   {[...Array(5)].map((_, j) => (
                     <td key={j} style={{ padding: '16px 20px' }}>
                       <div style={{ height: '16px', borderRadius: '6px', backgroundColor: '#1f1f1f' }} />
@@ -244,7 +316,7 @@ export default function FlujoCajaPage() {
               <tr>
                 <td colSpan={5} style={{ padding: '48px', textAlign: 'center', color: '#4b5563' }}>
                   <Wallet size={32} style={{ margin: '0 auto 12px', display: 'block', opacity: 0.3 }} />
-                  Aún no hay movimientos registrados.
+                  {periodFilter !== 'todo' ? 'No hay movimientos en este período.' : 'Aún no hay movimientos registrados.'}
                 </td>
               </tr>
             ) : (
