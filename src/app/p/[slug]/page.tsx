@@ -1,50 +1,51 @@
-import { createClient } from '@supabase/supabase-js'
-import { notFound } from 'next/navigation'
+'use client'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
+import { useEffect, useState } from 'react'
+import { useParams } from 'next/navigation'
+import { supabase } from '@/lib/supabase'
 
-interface CustomLink {
-  label: string
-  url: string
-  icon?: string
-}
+interface CustomLink { label: string; url: string; icon?: string }
 
 interface NFCProfile {
-  id: string
-  slug: string
-  display_name: string
-  tagline: string | null
-  company: string | null
-  avatar_url: string | null
-  whatsapp: string | null
-  email: string | null
-  website: string | null
-  instagram: string | null
-  tiktok: string | null
-  linkedin: string | null
-  facebook: string | null
-  youtube: string | null
-  custom_links: CustomLink[]
-  is_active: boolean
-  views: number
+  id: string; slug: string; display_name: string; tagline: string | null
+  company: string | null; avatar_url: string | null; whatsapp: string | null
+  email: string | null; website: string | null; instagram: string | null
+  tiktok: string | null; linkedin: string | null; facebook: string | null
+  youtube: string | null; custom_links: CustomLink[]; is_active: boolean; views: number
 }
 
-export default async function ProfilePage({ params }: { params: { slug: string } }) {
-  const { data, error } = await supabase
-    .from('nfc_profiles')
-    .select('*')
-    .eq('slug', params.slug)
-    .single()
+export default function ProfilePage() {
+  const params = useParams()
+  const slug = params.slug as string
+  const [profile, setProfile] = useState<NFCProfile | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [notFound, setNotFound] = useState(false)
 
-  if (error || !data || !data.is_active) {
-    console.log('NFC Profile error:', error, 'slug:', params.slug, 'data:', data)
-    notFound()
-  }
+  useEffect(() => {
+    async function fetchProfile() {
+      const { data, error } = await supabase.from('nfc_profiles').select('*').eq('slug', slug).eq('is_active', true).single()
+      if (error || !data) { setNotFound(true) }
+      else { setProfile(data as NFCProfile) }
+      setLoading(false)
+    }
+    if (slug) fetchProfile()
+  }, [slug])
 
-  const profile = data as NFCProfile
+  if (loading) return (
+    <div style={{ minHeight: '100vh', backgroundColor: '#0a0a0a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ width: '32px', height: '32px', borderRadius: '50%', border: '3px solid #00cfff22', borderTopColor: '#00cfff', animation: 'spin 0.8s linear infinite' }} />
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } } * { box-sizing: border-box; margin: 0; padding: 0; } body { background: #0a0a0a !important; }`}</style>
+    </div>
+  )
+
+  if (notFound || !profile) return (
+    <div style={{ minHeight: '100vh', backgroundColor: '#0a0a0a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '16px' }}>
+      <style>{`* { box-sizing: border-box; margin: 0; padding: 0; } body { background: #0a0a0a !important; }`}</style>
+      <p style={{ fontSize: '48px' }}>⚡</p>
+      <p style={{ color: '#6b7280', fontSize: '16px' }}>Perfil no encontrado</p>
+      <p style={{ color: '#374151', fontSize: '13px' }}>Este enlace no existe o fue desactivado</p>
+    </div>
+  )
 
   const socialLinks = [
     { key: 'whatsapp', value: profile.whatsapp, label: 'WhatsApp', icon: '💬', color: '#25d366', href: (v: string) => `https://wa.me/57${v.replace(/\D/g, '')}` },
@@ -63,16 +64,7 @@ export default async function ProfilePage({ params }: { params: { slug: string }
     <>
       <style>{`
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body {
-          background: #0a0a0a !important;
-          color: #f0f0f0;
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-          min-height: 100vh;
-          display: flex;
-          align-items: flex-start;
-          justify-content: center;
-          padding: 0 0 40px 0;
-        }
+        body { background: #0a0a0a !important; color: #f0f0f0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; min-height: 100vh; display: flex; align-items: flex-start; justify-content: center; padding: 0 0 40px 0; }
         .nfc-container { width: 100%; max-width: 480px; display: flex; flex-direction: column; align-items: center; }
         .nfc-hero { width: 100%; padding: 48px 24px 32px; display: flex; flex-direction: column; align-items: center; text-align: center; background: linear-gradient(180deg, #111111 0%, #0a0a0a 100%); }
         .nfc-avatar { width: 96px; height: 96px; border-radius: 50%; border: 3px solid #00cfff44; margin-bottom: 16px; background: #161616; display: flex; align-items: center; justify-content: center; font-size: 36px; font-weight: 900; color: #00cfff; overflow: hidden; }
@@ -81,7 +73,7 @@ export default async function ProfilePage({ params }: { params: { slug: string }
         .nfc-tagline { font-size: 15px; color: #9ca3af; margin-bottom: 6px; line-height: 1.5; }
         .nfc-company { font-size: 13px; color: #4b5563; font-weight: 500; }
         .nfc-links { width: 100%; padding: 8px 16px; display: flex; flex-direction: column; gap: 10px; }
-        .nfc-link-btn { display: flex; align-items: center; gap: 14px; padding: 16px 20px; border-radius: 14px; background: #161616; border: 1px solid #1f1f1f; text-decoration: none; color: #f0f0f0; font-size: 15px; font-weight: 600; -webkit-tap-highlight-color: transparent; }
+        .nfc-link-btn { display: flex; align-items: center; gap: 14px; padding: 16px 20px; border-radius: 14px; background: #161616; border: 1px solid #1f1f1f; text-decoration: none; color: #f0f0f0; font-size: 15px; font-weight: 600; -webkit-tap-highlight-color: transparent; transition: all 0.15s ease; }
         .nfc-link-btn:active { transform: scale(0.97); background: #1f1f1f; }
         .nfc-link-icon { width: 42px; height: 42px; border-radius: 11px; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; }
         .nfc-arrow { margin-left: auto; font-size: 16px; color: #374151; }
@@ -89,20 +81,15 @@ export default async function ProfilePage({ params }: { params: { slug: string }
         .nfc-footer { margin-top: 32px; display: flex; flex-direction: column; align-items: center; gap: 8px; padding-bottom: 16px; }
         .nfc-badge { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 999px; background: #00cfff0d; border: 1px solid #00cfff22; text-decoration: none; font-size: 12px; font-weight: 700; color: #00cfff; }
       `}</style>
-
       <div className="nfc-container">
         <div className="nfc-hero">
           <div className="nfc-avatar">
-            {profile.avatar_url
-              ? <img src={profile.avatar_url} alt={profile.display_name} />
-              : profile.display_name.charAt(0).toUpperCase()
-            }
+            {profile.avatar_url ? <img src={profile.avatar_url} alt={profile.display_name} /> : profile.display_name.charAt(0).toUpperCase()}
           </div>
           <h1 className="nfc-name">{profile.display_name}</h1>
           {profile.tagline && <p className="nfc-tagline">{profile.tagline}</p>}
           {profile.company && <p className="nfc-company">🏢 {profile.company}</p>}
         </div>
-
         <div className="nfc-links">
           {socialLinks.map(link => (
             <a key={link.key} href={link.href(link.value!)} target="_blank" rel="noopener noreferrer" className="nfc-link-btn">
@@ -120,11 +107,8 @@ export default async function ProfilePage({ params }: { params: { slug: string }
             </a>
           ))}
         </div>
-
         <div className="nfc-footer">
-          <a href="https://taply-inventory.vercel.app" className="nfc-badge" target="_blank" rel="noopener noreferrer">
-            ⚡ Creado con Taply NFC
-          </a>
+          <a href="https://taply-inventory.vercel.app" className="nfc-badge" target="_blank" rel="noopener noreferrer">⚡ Creado con Taply NFC</a>
         </div>
       </div>
     </>
