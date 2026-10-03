@@ -1,32 +1,22 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { usePathname } from 'next/navigation'
 import { checkAuth, login } from '@/lib/auth'
 import { Eye, EyeOff } from 'lucide-react'
 import { TaplyLogo } from './TaplyLogo'
 import { Navbar } from './Navbar'
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname()
   const [authenticated, setAuthenticated] = useState(false)
   const [loading, setLoading] = useState(true)
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [showPassword, setShowPassword] = useState(false)
 
-  const isPublicRoute = pathname.startsWith('/p/')
-
   useEffect(() => {
-    if (isPublicRoute) { setLoading(false); return }
     setAuthenticated(checkAuth())
     setLoading(false)
-  }, [isPublicRoute])
-
-  // Ruta pública — sin login, sin navbar
-  if (isPublicRoute) {
-    return <>{children}</>
-  }
+  }, [])
 
   if (loading) return (
     <div style={{ minHeight: '100vh', backgroundColor: '#0d0d0d', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -70,7 +60,6 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     </div>
   )
 
-  // Ruta protegida autenticada — con Navbar
   return (
     <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#0d0d0d' }}>
       <Navbar />
