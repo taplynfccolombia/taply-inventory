@@ -3,8 +3,8 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { PRODUCT_CONFIG } from '@/lib/supabase'
-import { formatCOP, formatDateTime, generateWhatsAppLink, whatsAppPedidoMessage } from '@/lib/utils'
-import { Package, ChevronRight, MessageCircle } from 'lucide-react'
+import { formatCOP, formatDateTime, generateWhatsAppLink, whatsAppPedidoMessage, exportToCSV } from '@/lib/utils'
+import { Package, ChevronRight, MessageCircle, Download } from 'lucide-react'
 
 interface Order {
   id: string
@@ -36,6 +36,18 @@ export default function PedidosPage() {
   const [updatingId, setUpdatingId] = useState<string | null>(null)
   const [filterStatus, setFilterStatus] = useState<string>('todos')
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+
+  function handleExportCSV() {
+    const data = orders.map(o => ({
+      Fecha: formatDateTime(o.sale_date),
+      Producto: PRODUCT_CONFIG[o.product_type].label,
+      Cantidad: o.quantity,
+      'Ingreso (COP)': o.total_revenue,
+      Cliente: (o.client as unknown as { full_name: string } | null)?.full_name ?? '—',
+      Estado: ORDER_STEPS.find(s => s.key === o.order_status)?.label ?? o.order_status,
+    }))
+    exportToCSV(data, 'Taply_Pedidos')
+  }
 
   async function fetchOrders() {
     const { data } = await supabase
@@ -75,11 +87,17 @@ export default function PedidosPage() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
 
       {/* Header */}
-      <div>
-        <h1 style={{ margin: 0, fontSize: '32px', fontWeight: 900 }} className="taply-gradient-text">Pedidos</h1>
-        <p style={{ margin: '6px 0 0', fontSize: '14px', color: '#6b7280' }}>
-          Seguimiento del estado de producción y entrega
-        </p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div>
+          <h1 style={{ margin: 0, fontSize: '32px', fontWeight: 900 }} className="taply-gradient-text">Pedidos</h1>
+          <p style={{ margin: '6px 0 0', fontSize: '14px', color: '#6b7280' }}>
+            Seguimiento del estado de producción y entrega
+          </p>
+        </div>
+        <button onClick={handleExportCSV} disabled={orders.length === 0}
+          style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 18px', borderRadius: '12px', fontWeight: 600, fontSize: '13px', cursor: orders.length === 0 ? 'not-allowed' : 'pointer', border: '1px solid #2a2a2a', backgroundColor: 'transparent', color: '#6b7280' }}>
+          <Download size={15} /> CSV
+        </button>
       </div>
 
       {/* Pipeline */}

@@ -32,7 +32,15 @@ export default function ConfiguracionPage() {
       const { error: e4 } = await supabase.from('tasks').delete().neq('id', '00000000-0000-0000-0000-000000000000')
       if (e4) throw new Error(`Tareas: ${e4.message}`)
 
-      // 5. Resetear inventario a 0
+      // 5. Eliminar contenido
+      const { error: e5b } = await supabase.from('content_board').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+      if (e5b) throw new Error(`Contenido: ${e5b.message}`)
+
+      // 6. Eliminar metas
+      const { error: e5c } = await supabase.from('goals').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+      if (e5c) throw new Error(`Metas: ${e5c.message}`)
+
+      // 7. Resetear inventario a 0
       const { error: e5 } = await supabase
         .from('inventory')
         .update({ quantity: 0, notes: 'Stock físico único. Toda venta (Essential o Custom) descuenta 1 unidad.' })
