@@ -4,7 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { TaplyLogo } from './TaplyLogo'
-import { LayoutDashboard, ShoppingCart, Package, Users, Wallet, CheckSquare, Sparkles, Settings, ChevronLeft, ChevronRight, Menu } from 'lucide-react'
+import { LayoutDashboard, ShoppingCart, Package, Users, Wallet, CheckSquare, Sparkles, Settings, ChevronLeft, ChevronRight, Menu, Megaphone } from 'lucide-react'
 
 const navItems = [
   { href: '/',               label: 'Dashboard',     icon: LayoutDashboard },
@@ -14,6 +14,7 @@ const navItems = [
   { href: '/flujo-caja',     label: 'Flujo de Caja',  icon: Wallet },
   { href: '/tareas',         label: 'Tareas',         icon: CheckSquare },
   { href: '/contenido',      label: 'Contenido',      icon: Sparkles },
+  { href: '/ads',            label: 'ADS',            icon: Megaphone },
 ]
 
 const bottomItems = [
@@ -26,12 +27,10 @@ const SIDEBAR_COLLAPSED = 72
 export function Navbar() {
   const pathname = usePathname()
   const [collapsed, setCollapsed] = useState(false)
-
   const width = collapsed ? SIDEBAR_COLLAPSED : SIDEBAR_EXPANDED
 
   return (
     <>
-      {/* Sidebar */}
       <aside style={{
         position: 'fixed', left: 0, top: 0,
         height: '100vh', width: `${width}px`,
@@ -58,7 +57,6 @@ export function Navbar() {
           )}
         </div>
 
-        {/* Label menú */}
         {!collapsed && (
           <div style={{ padding: '28px 28px 10px' }}>
             <span style={{ color: '#374151', fontSize: '10px', fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase' }}>
@@ -67,10 +65,9 @@ export function Navbar() {
           </div>
         )}
 
-        {/* Nav principal */}
         <nav style={{ flex: 1, padding: collapsed ? '16px 12px' : '8px 16px', display: 'flex', flexDirection: 'column', gap: '4px', overflowY: 'auto' }}>
           {navItems.map(({ href, label, icon: Icon }) => {
-            const isActive = pathname === href
+            const isActive = pathname === href || (href === '/ads' && pathname.startsWith('/ads'))
             return (
               <Link key={href} href={href}
                 title={collapsed ? label : undefined}
@@ -93,10 +90,8 @@ export function Navbar() {
           })}
         </nav>
 
-        {/* Separador */}
         <div style={{ margin: collapsed ? '0 12px' : '0 16px', borderTop: '1px solid #1f1f1f' }} />
 
-        {/* Nav inferior */}
         <div style={{ padding: collapsed ? '12px' : '12px 16px' }}>
           {bottomItems.map(({ href, label, icon: Icon }) => {
             const isActive = pathname === href
@@ -122,7 +117,6 @@ export function Navbar() {
           })}
         </div>
 
-        {/* Footer */}
         {!collapsed && (
           <div style={{ padding: '20px 28px', borderTop: '1px solid #1f1f1f' }}>
             <p style={{ color: '#374151', fontSize: '12px', fontWeight: 600, margin: 0 }}>Taply Inventory v1.0</p>
@@ -130,11 +124,9 @@ export function Navbar() {
           </div>
         )}
 
-        {/* Botón expandir (solo cuando colapsado, en el footer) */}
         {collapsed && (
           <div style={{ padding: '16px 12px', borderTop: '1px solid #1f1f1f' }}>
             <button onClick={() => setCollapsed(false)}
-              title="Expandir menú"
               style={{ width: '100%', padding: '10px', borderRadius: '10px', cursor: 'pointer', backgroundColor: 'transparent', border: '1px solid #2a2a2a', color: '#4b5563', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <ChevronRight size={16} />
             </button>
@@ -142,7 +134,6 @@ export function Navbar() {
         )}
       </aside>
 
-      {/* Spacer dinámico para el contenido principal */}
       <style>{`
         main { margin-left: ${width}px !important; transition: margin-left 0.25s ease; }
       `}</style>
