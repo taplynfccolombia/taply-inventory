@@ -1,12 +1,14 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import type { Client } from '@/lib/supabase'
 import { formatDate } from '@/lib/utils'
-import { Users, Plus, X, Search, Trash2 } from 'lucide-react'
+import { Users, Plus, X, Search, Trash2, ChevronRight } from 'lucide-react'
 
 export default function ClientesPage() {
+  const router = useRouter()
   const [clients, setClients] = useState<Client[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -50,8 +52,7 @@ export default function ClientesPage() {
     const { error } = await supabase.from('clients').delete().eq('id', id)
     if (error) { setMessage({ type: 'error', text: 'Error al eliminar el cliente.' }) }
     else { setMessage({ type: 'success', text: 'Cliente eliminado correctamente.' }); fetchClients() }
-    setDeletingId(null)
-    setConfirmDelete(null)
+    setDeletingId(null); setConfirmDelete(null)
   }
 
   const filtered = clients.filter(c =>
@@ -103,7 +104,7 @@ export default function ClientesPage() {
               </div>
             ))}
           </div>
-          {message && (
+          {message && showForm && (
             <div style={{ marginTop: '16px', padding: '12px 16px', borderRadius: '10px', fontSize: '14px',
               backgroundColor: message.type === 'success' ? '#00ff940d' : '#ff4d4d0d',
               border: `1px solid ${message.type === 'success' ? '#00ff9422' : '#ff4d4d22'}`,
@@ -169,33 +170,49 @@ export default function ClientesPage() {
               </tr>
             ) : (
               filtered.map((client, i) => (
-                <tr key={client.id} style={{ backgroundColor: i % 2 === 0 ? '#0d0d0d' : '#111111', borderBottom: '1px solid #161616' }}>
-                  <td style={{ padding: '16px 20px', fontWeight: 500, color: '#f0f0f0' }}>{client.full_name}</td>
+                <tr key={client.id}
+                  style={{ backgroundColor: i % 2 === 0 ? '#0d0d0d' : '#111111', borderBottom: '1px solid #161616', cursor: 'pointer' }}
+                  onClick={() => router.push(`/clientes/${client.id}`)}>
+                  <td style={{ padding: '16px 20px', fontWeight: 500, color: '#f0f0f0' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <div style={{ width: '32px', height: '32px', borderRadius: '8px', backgroundColor: '#00cfff0d', border: '1px solid #00cfff22', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <span style={{ fontSize: '13px', fontWeight: 700, color: '#00cfff' }}>
+                          {client.full_name.charAt(0).toUpperCase()}
+                        </span>
+                      </div>
+                      {client.full_name}
+                    </div>
+                  </td>
                   <td style={{ padding: '16px 20px', color: '#9ca3af' }}>{client.company ?? '—'}</td>
                   <td style={{ padding: '16px 20px', color: '#9ca3af' }}>{client.phone ?? '—'}</td>
                   <td style={{ padding: '16px 20px', color: '#9ca3af' }}>{client.city ?? '—'}</td>
                   <td style={{ padding: '16px 20px', color: '#6b7280' }}>{formatDate(client.created_at)}</td>
-                  <td style={{ padding: '16px 20px' }}>
-                    {confirmDelete === client.id ? (
-                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                        <span style={{ fontSize: '12px', color: '#ff4d4d' }}>¿Eliminar?</span>
-                        <button onClick={() => handleDelete(client.id)} disabled={deletingId === client.id}
-                          style={{ padding: '4px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', border: 'none', backgroundColor: '#ff4d4d', color: '#fff' }}>
-                          {deletingId === client.id ? '...' : 'Sí'}
-                        </button>
-                        <button onClick={() => setConfirmDelete(null)}
-                          style={{ padding: '4px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', border: '1px solid #2a2a2a', backgroundColor: 'transparent', color: '#6b7280' }}>
-                          No
-                        </button>
-                      </div>
-                    ) : (
-                      <button onClick={() => setConfirmDelete(client.id)}
-                        style={{ padding: '8px', borderRadius: '8px', cursor: 'pointer', backgroundColor: 'transparent', border: '1px solid #1f1f1f', color: '#374151', display: 'flex', alignItems: 'center' }}
-                        onMouseEnter={e => { (e.currentTarget).style.backgroundColor = '#ff4d4d0d'; (e.currentTarget).style.borderColor = '#ff4d4d22'; (e.currentTarget).style.color = '#ff4d4d' }}
-                        onMouseLeave={e => { (e.currentTarget).style.backgroundColor = 'transparent'; (e.currentTarget).style.borderColor = '#1f1f1f'; (e.currentTarget).style.color = '#374151' }}>
-                        <Trash2 size={15} />
+                  <td style={{ padding: '16px 20px' }} onClick={e => e.stopPropagation()}>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <button onClick={() => router.push(`/clientes/${client.id}`)}
+                        style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '6px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', backgroundColor: '#00cfff0d', border: '1px solid #00cfff22', color: '#00cfff' }}>
+                        Ver <ChevronRight size={12} />
                       </button>
-                    )}
+                      {confirmDelete === client.id ? (
+                        <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                          <button onClick={() => handleDelete(client.id)} disabled={deletingId === client.id}
+                            style={{ padding: '4px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', border: 'none', backgroundColor: '#ff4d4d', color: '#fff' }}>
+                            {deletingId === client.id ? '...' : 'Sí'}
+                          </button>
+                          <button onClick={() => setConfirmDelete(null)}
+                            style={{ padding: '4px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', border: '1px solid #2a2a2a', backgroundColor: 'transparent', color: '#6b7280' }}>
+                            No
+                          </button>
+                        </div>
+                      ) : (
+                        <button onClick={() => setConfirmDelete(client.id)}
+                          style={{ padding: '6px', borderRadius: '8px', cursor: 'pointer', backgroundColor: 'transparent', border: '1px solid #1f1f1f', color: '#374151', display: 'flex', alignItems: 'center' }}
+                          onMouseEnter={e => { (e.currentTarget).style.backgroundColor = '#ff4d4d0d'; (e.currentTarget).style.color = '#ff4d4d' }}
+                          onMouseLeave={e => { (e.currentTarget).style.backgroundColor = 'transparent'; (e.currentTarget).style.color = '#374151' }}>
+                          <Trash2 size={14} />
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))
