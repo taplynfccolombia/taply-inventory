@@ -4,11 +4,12 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { TaplyLogo } from './TaplyLogo'
-import { LayoutDashboard, ShoppingCart, Package, Users, Wallet, CheckSquare, Sparkles, Settings, ChevronLeft, ChevronRight, Menu, Megaphone, FileText } from 'lucide-react'
+import { LayoutDashboard, ShoppingCart, Package, Users, Wallet, CheckSquare, Sparkles, Settings, ChevronLeft, ChevronRight, Menu, Megaphone, FileText, Truck } from 'lucide-react'
 
 const navItems = [
   { href: '/',               label: 'Dashboard',     icon: LayoutDashboard },
   { href: '/ventas',         label: 'Ventas',         icon: ShoppingCart },
+  { href: '/pedidos',        label: 'Pedidos',        icon: Truck },
   { href: '/inventario',     label: 'Inventario',     icon: Package },
   { href: '/clientes',       label: 'Clientes',       icon: Users },
   { href: '/flujo-caja',     label: 'Flujo de Caja',  icon: Wallet },
