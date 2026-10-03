@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { checkAuth, login, logout } from '@/lib/auth'
 import { TaplyLogo } from './TaplyLogo'
-import { Lock, Eye, EyeOff, LogOut, KeyRound } from 'lucide-react'
+import { Lock, Eye, EyeOff } from 'lucide-react'
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
   const [isAuth, setIsAuth] = useState<boolean | null>(null)
@@ -11,11 +11,6 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [showChangePassword, setShowChangePassword] = useState(false)
-  const [changeForm, setChangeForm] = useState({ current: '', newPass: '', confirm: '' })
-  const [changeError, setChangeError] = useState('')
-  const [changeSuccess, setChangeSuccess] = useState('')
-  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
 
   useEffect(() => { setIsAuth(checkAuth()) }, [])
 
@@ -28,18 +23,6 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
       else { setError('Contraseña incorrecta. Inténtalo de nuevo.'); setPassword('') }
       setLoading(false)
     }, 600)
-  }
-
-  function handleChangePassword(e: React.FormEvent) {
-    e.preventDefault()
-    setChangeError(''); setChangeSuccess('')
-    if (!login(changeForm.current)) { setChangeError('La contraseña actual es incorrecta.'); return }
-    if (changeForm.newPass.length < 6) { setChangeError('La nueva contraseña debe tener al menos 6 caracteres.'); return }
-    if (changeForm.newPass !== changeForm.confirm) { setChangeError('Las contraseñas nuevas no coinciden.'); return }
-    localStorage.setItem('taply_custom_password', changeForm.newPass)
-    setChangeSuccess('Contraseña actualizada correctamente.')
-    setChangeForm({ current: '', newPass: '', confirm: '' })
-    setTimeout(() => { setShowChangePassword(false); setChangeSuccess('') }, 2000)
   }
 
   if (isAuth === null) {
@@ -103,91 +86,5 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     )
   }
 
-  return (
-    <>
-      {children}
-
-      {/* Botones sesión */}
-      <div className="session-buttons" style={{ position: 'fixed', bottom: '20px', right: '20px', zIndex: 100, display: 'flex', gap: '8px', alignItems: 'center' }}>
-        <button onClick={() => setShowChangePassword(true)}
-          style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px', borderRadius: '10px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', backgroundColor: '#161616', border: '1px solid #1f1f1f', color: '#6b7280' }}
-          onMouseEnter={e => { (e.currentTarget).style.color = '#00cfff'; (e.currentTarget).style.borderColor = '#00cfff22' }}
-          onMouseLeave={e => { (e.currentTarget).style.color = '#6b7280'; (e.currentTarget).style.borderColor = '#1f1f1f' }}>
-          <KeyRound size={13} /> Cambiar contraseña
-        </button>
-        <button onClick={() => setShowLogoutConfirm(true)}
-          style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px', borderRadius: '10px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', backgroundColor: '#161616', border: '1px solid #1f1f1f', color: '#6b7280' }}
-          onMouseEnter={e => { (e.currentTarget).style.color = '#ff4d4d'; (e.currentTarget).style.borderColor = '#ff4d4d22' }}
-          onMouseLeave={e => { (e.currentTarget).style.color = '#6b7280'; (e.currentTarget).style.borderColor = '#1f1f1f' }}>
-          <LogOut size={13} /> Cerrar sesión
-        </button>
-      </div>
-
-      {/* Modal: Confirmar cerrar sesión */}
-      {showLogoutConfirm && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: '#0d0d0dcc', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
-          <div style={{ width: '100%', maxWidth: '380px', borderRadius: '20px', padding: '32px', backgroundColor: '#161616', border: '1px solid #1f1f1f' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
-              <LogOut size={20} style={{ color: '#ff4d4d' }} />
-              <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: '#f0f0f0' }}>Cerrar sesión</h2>
-            </div>
-            <p style={{ margin: '0 0 24px', fontSize: '14px', color: '#6b7280', lineHeight: '1.6' }}>
-              Tendrás que ingresar tu contraseña nuevamente para acceder al sistema.
-            </p>
-            <div style={{ display: 'flex', gap: '12px' }}>
-              <button onClick={() => { logout(); setIsAuth(false); setShowLogoutConfirm(false) }}
-                style={{ flex: 1, padding: '12px', borderRadius: '10px', fontWeight: 700, fontSize: '14px', cursor: 'pointer', border: 'none', backgroundColor: '#ff4d4d', color: '#fff' }}>
-                Cerrar sesión
-              </button>
-              <button onClick={() => setShowLogoutConfirm(false)}
-                style={{ flex: 1, padding: '12px', borderRadius: '10px', fontWeight: 700, fontSize: '14px', cursor: 'pointer', border: '1px solid #2a2a2a', backgroundColor: 'transparent', color: '#6b7280' }}>
-                Cancelar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal: Cambiar contraseña */}
-      {showChangePassword && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: '#0d0d0dcc', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
-          <div style={{ width: '100%', maxWidth: '420px', borderRadius: '20px', padding: '32px', backgroundColor: '#161616', border: '1px solid #1f1f1f' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
-              <div style={{ width: '36px', height: '36px', borderRadius: '10px', backgroundColor: '#00cfff0d', border: '1px solid #00cfff22', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <KeyRound size={16} style={{ color: '#00cfff' }} />
-              </div>
-              <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: '#f0f0f0' }}>Cambiar contraseña</h2>
-            </div>
-            <form onSubmit={handleChangePassword} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              {[
-                { key: 'current', label: 'Contraseña actual', placeholder: 'Tu contraseña actual' },
-                { key: 'newPass', label: 'Nueva contraseña', placeholder: 'Mínimo 6 caracteres' },
-                { key: 'confirm', label: 'Confirmar nueva contraseña', placeholder: 'Repite la nueva contraseña' },
-              ].map(({ key, label, placeholder }) => (
-                <div key={key}>
-                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#9ca3af', marginBottom: '6px' }}>{label}</label>
-                  <input type="password" value={changeForm[key as keyof typeof changeForm]}
-                    onChange={e => setChangeForm(p => ({ ...p, [key]: e.target.value }))}
-                    placeholder={placeholder}
-                    style={{ width: '100%', padding: '12px 14px', borderRadius: '10px', fontSize: '14px', outline: 'none', backgroundColor: '#0d0d0d', border: '1px solid #2a2a2a', color: '#f0f0f0', boxSizing: 'border-box' }} />
-                </div>
-              ))}
-              {changeError && <p style={{ margin: 0, fontSize: '13px', color: '#ff4d4d' }}>{changeError}</p>}
-              {changeSuccess && <p style={{ margin: 0, fontSize: '13px', color: '#00ff94' }}>{changeSuccess}</p>}
-              <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
-                <button type="submit"
-                  style={{ flex: 1, padding: '12px', borderRadius: '10px', fontWeight: 700, fontSize: '14px', cursor: 'pointer', border: 'none', background: 'linear-gradient(90deg, #00cfff, #00ff94)', color: '#0d0d0d' }}>
-                  Guardar
-                </button>
-                <button type="button" onClick={() => { setShowChangePassword(false); setChangeForm({ current: '', newPass: '', confirm: '' }); setChangeError('') }}
-                  style={{ flex: 1, padding: '12px', borderRadius: '10px', fontWeight: 700, fontSize: '14px', cursor: 'pointer', border: '1px solid #2a2a2a', backgroundColor: 'transparent', color: '#6b7280' }}>
-                  Cancelar
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-    </>
-  )
+  return <>{children}</>
 }
