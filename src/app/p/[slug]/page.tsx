@@ -1,5 +1,10 @@
-import { supabase } from '@/lib/supabase'
+import { createClient } from '@supabase/supabase-js'
 import { notFound } from 'next/navigation'
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
 
 interface CustomLink {
   label: string
@@ -27,19 +32,19 @@ interface NFCProfile {
   views: number
 }
 
-async function getProfile(slug: string): Promise<NFCProfile | null> {
-  const { data } = await supabase
+export default async function ProfilePage({ params }: { params: { slug: string } }) {
+  const { data, error } = await supabase
     .from('nfc_profiles')
     .select('*')
-    .eq('slug', slug)
-    .eq('is_active', true)
+    .eq('slug', params.slug)
     .single()
-  return data
-}
 
-export default async function ProfilePage({ params }: { params: { slug: string } }) {
-  const profile = await getProfile(params.slug)
-  if (!profile) notFound()
+  if (error || !data || !data.is_active) {
+    console.log('NFC Profile error:', error, 'slug:', params.slug, 'data:', data)
+    notFound()
+  }
+
+  const profile = data as NFCProfile
 
   const socialLinks = [
     { key: 'whatsapp', value: profile.whatsapp, label: 'WhatsApp', icon: '💬', color: '#25d366', href: (v: string) => `https://wa.me/57${v.replace(/\D/g, '')}` },
@@ -68,129 +73,21 @@ export default async function ProfilePage({ params }: { params: { slug: string }
           justify-content: center;
           padding: 0 0 40px 0;
         }
-        .nfc-container {
-          width: 100%;
-          max-width: 480px;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-        }
-        .nfc-hero {
-          width: 100%;
-          padding: 48px 24px 32px;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          text-align: center;
-          background: linear-gradient(180deg, #111111 0%, #0a0a0a 100%);
-        }
-        .nfc-avatar {
-          width: 96px;
-          height: 96px;
-          border-radius: 50%;
-          border: 3px solid #00cfff44;
-          margin-bottom: 16px;
-          background: #161616;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 36px;
-          font-weight: 900;
-          color: #00cfff;
-          overflow: hidden;
-        }
+        .nfc-container { width: 100%; max-width: 480px; display: flex; flex-direction: column; align-items: center; }
+        .nfc-hero { width: 100%; padding: 48px 24px 32px; display: flex; flex-direction: column; align-items: center; text-align: center; background: linear-gradient(180deg, #111111 0%, #0a0a0a 100%); }
+        .nfc-avatar { width: 96px; height: 96px; border-radius: 50%; border: 3px solid #00cfff44; margin-bottom: 16px; background: #161616; display: flex; align-items: center; justify-content: center; font-size: 36px; font-weight: 900; color: #00cfff; overflow: hidden; }
         .nfc-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
-        .nfc-name {
-          font-size: 28px;
-          font-weight: 900;
-          background: linear-gradient(90deg, #00cfff, #00ff94);
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
-          background-clip: text;
-          margin-bottom: 8px;
-          line-height: 1.2;
-        }
-        .nfc-tagline {
-          font-size: 15px;
-          color: #9ca3af;
-          margin-bottom: 6px;
-          line-height: 1.5;
-        }
-        .nfc-company {
-          font-size: 13px;
-          color: #4b5563;
-          font-weight: 500;
-        }
-        .nfc-links {
-          width: 100%;
-          padding: 8px 16px;
-          display: flex;
-          flex-direction: column;
-          gap: 10px;
-        }
-        .nfc-link-btn {
-          display: flex;
-          align-items: center;
-          gap: 14px;
-          padding: 16px 20px;
-          border-radius: 14px;
-          background: #161616;
-          border: 1px solid #1f1f1f;
-          text-decoration: none;
-          color: #f0f0f0;
-          font-size: 15px;
-          font-weight: 600;
-          transition: all 0.15s ease;
-          cursor: pointer;
-          -webkit-tap-highlight-color: transparent;
-        }
-        .nfc-link-btn:active {
-          transform: scale(0.97);
-          background: #1f1f1f;
-        }
-        .nfc-link-icon {
-          width: 42px;
-          height: 42px;
-          border-radius: 11px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 20px;
-          flex-shrink: 0;
-        }
-        .nfc-arrow {
-          margin-left: auto;
-          font-size: 16px;
-          color: #374151;
-        }
-        .nfc-divider {
-          width: calc(100% - 32px);
-          height: 1px;
-          background: #1f1f1f;
-          margin: 4px 0;
-        }
-        .nfc-footer {
-          margin-top: 32px;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          gap: 8px;
-          padding-bottom: 16px;
-        }
-        .nfc-badge {
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          padding: 8px 16px;
-          border-radius: 999px;
-          background: #00cfff0d;
-          border: 1px solid #00cfff22;
-          text-decoration: none;
-          font-size: 12px;
-          font-weight: 700;
-          color: #00cfff;
-          letter-spacing: 0.02em;
-        }
+        .nfc-name { font-size: 28px; font-weight: 900; background: linear-gradient(90deg, #00cfff, #00ff94); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; margin-bottom: 8px; line-height: 1.2; }
+        .nfc-tagline { font-size: 15px; color: #9ca3af; margin-bottom: 6px; line-height: 1.5; }
+        .nfc-company { font-size: 13px; color: #4b5563; font-weight: 500; }
+        .nfc-links { width: 100%; padding: 8px 16px; display: flex; flex-direction: column; gap: 10px; }
+        .nfc-link-btn { display: flex; align-items: center; gap: 14px; padding: 16px 20px; border-radius: 14px; background: #161616; border: 1px solid #1f1f1f; text-decoration: none; color: #f0f0f0; font-size: 15px; font-weight: 600; -webkit-tap-highlight-color: transparent; }
+        .nfc-link-btn:active { transform: scale(0.97); background: #1f1f1f; }
+        .nfc-link-icon { width: 42px; height: 42px; border-radius: 11px; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; }
+        .nfc-arrow { margin-left: auto; font-size: 16px; color: #374151; }
+        .nfc-divider { width: calc(100% - 32px); height: 1px; background: #1f1f1f; margin: 4px 0; }
+        .nfc-footer { margin-top: 32px; display: flex; flex-direction: column; align-items: center; gap: 8px; padding-bottom: 16px; }
+        .nfc-badge { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 999px; background: #00cfff0d; border: 1px solid #00cfff22; text-decoration: none; font-size: 12px; font-weight: 700; color: #00cfff; }
       `}</style>
 
       <div className="nfc-container">
@@ -208,34 +105,16 @@ export default async function ProfilePage({ params }: { params: { slug: string }
 
         <div className="nfc-links">
           {socialLinks.map(link => (
-            <a
-              key={link.key}
-              href={link.href(link.value!)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="nfc-link-btn"
-            >
-              <div className="nfc-link-icon" style={{ background: link.color + '18', border: `1px solid ${link.color}33` }}>
-                {link.icon}
-              </div>
+            <a key={link.key} href={link.href(link.value!)} target="_blank" rel="noopener noreferrer" className="nfc-link-btn">
+              <div className="nfc-link-icon" style={{ background: link.color + '18', border: `1px solid ${link.color}33` }}>{link.icon}</div>
               <span>{link.label}</span>
               <span className="nfc-arrow">→</span>
             </a>
           ))}
-
           {customLinks.length > 0 && socialLinks.length > 0 && <div className="nfc-divider" />}
-
           {customLinks.map((link, i) => (
-            <a
-              key={i}
-              href={link.url.startsWith('http') ? link.url : `https://${link.url}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="nfc-link-btn"
-            >
-              <div className="nfc-link-icon" style={{ background: '#00cfff18', border: '1px solid #00cfff33' }}>
-                {link.icon ?? '🔗'}
-              </div>
+            <a key={i} href={link.url.startsWith('http') ? link.url : `https://${link.url}`} target="_blank" rel="noopener noreferrer" className="nfc-link-btn">
+              <div className="nfc-link-icon" style={{ background: '#00cfff18', border: '1px solid #00cfff33' }}>{link.icon ?? '🔗'}</div>
               <span>{link.label}</span>
               <span className="nfc-arrow">→</span>
             </a>
@@ -243,12 +122,7 @@ export default async function ProfilePage({ params }: { params: { slug: string }
         </div>
 
         <div className="nfc-footer">
-          <a
-            href="https://taply-inventory.vercel.app"
-            className="nfc-badge"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
+          <a href="https://taply-inventory.vercel.app" className="nfc-badge" target="_blank" rel="noopener noreferrer">
             ⚡ Creado con Taply NFC
           </a>
         </div>
