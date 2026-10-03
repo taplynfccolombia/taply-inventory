@@ -7,12 +7,10 @@ html, body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Scrollbar */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: #111111; }
 ::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 3px; }
 
-/* Gradiente de texto Taply */
 .taply-gradient-text {
   background: linear-gradient(90deg, #00cfff, #00ff94);
   -webkit-background-clip: text;
@@ -20,63 +18,82 @@ html, body {
   background-clip: text;
 }
 
-/* Inputs y selects globales */
-input, select, textarea {
-  font-family: inherit;
+input, select, textarea { font-family: inherit; }
+
+/* ── DESKTOP ──────────────────────────────────────── */
+.main-content {
+  flex: 1;
+  padding: 40px;
+  overflow-x: hidden;
+  max-width: 100%;
 }
 
-/* ── RESPONSIVE MÓVIL ─────────────────────────────── */
+/* ── MÓVIL ────────────────────────────────────────── */
 @media (max-width: 768px) {
-
-  /* Layout principal */
-  main {
-    margin-left: 0 !important;
+  .main-content {
     padding: 16px !important;
-    padding-bottom: 80px !important;
+    padding-top: 72px !important;
+    padding-bottom: 100px !important;
+    margin-left: 0 !important;
   }
 
   /* Títulos */
-  h1 { font-size: 24px !important; }
-  h2 { font-size: 18px !important; }
-  h3 { font-size: 15px !important; }
+  h1 { font-size: 22px !important; }
+  h2 { font-size: 17px !important; }
+  h3 { font-size: 14px !important; }
 
-  /* Grids adaptables */
-  .grid-5 { grid-template-columns: 1fr 1fr !important; }
-  .grid-4 { grid-template-columns: 1fr 1fr !important; }
-  .grid-3 { grid-template-columns: 1fr !important; }
-  .grid-2 { grid-template-columns: 1fr !important; }
-
-  /* Tablas horizontales */
-  .table-scroll {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
+  /* Grids — todo a 2 columnas en móvil */
+  [style*="grid-template-columns: repeat(5"] {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+  [style*="grid-template-columns: repeat(4"] {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+  [style*="grid-template-columns: repeat(3"] {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+  [style*="grid-template-columns: 2fr 1fr"] {
+    grid-template-columns: 1fr !important;
+  }
+  [style*="grid-template-columns: 1fr 1fr 1fr"] {
+    grid-template-columns: 1fr 1fr !important;
+  }
+  [style*="gridTemplateColumns: 'repeat(5"] {
+    grid-template-columns: repeat(2, 1fr) !important;
   }
 
-  /* Ocultar columnas opcionales en móvil */
+  /* Tablas — scroll horizontal */
+  table { font-size: 12px !important; }
+  th, td { padding: 10px 12px !important; }
+
+  /* Ocultar columnas menos importantes en tablas móvil */
   .hide-mobile { display: none !important; }
 
-  /* Botones más grandes para touch */
-  button { min-height: 40px; }
+  /* Botones touch-friendly */
+  button { min-height: 38px; }
 
-  /* Cards con menos padding */
-  .card-mobile { padding: 16px !important; }
-}
+  /* Selector período — wrap */
+  [style*="display: 'flex'"][style*="gap: '4px'"] {
+    flex-wrap: wrap !important;
+  }
 
-/* ── RESPONSIVE TABLET ────────────────────────────── */
-@media (max-width: 1024px) and (min-width: 769px) {
-  .grid-5 { grid-template-columns: repeat(3, 1fr) !important; }
-  .grid-4 { grid-template-columns: 1fr 1fr !important; }
-}
-
-/* ── Botones de sesión en móvil ───────────────────── */
-@media (max-width: 768px) {
+  /* Botones de sesión — más pequeños y arriba del fold */
   .session-buttons {
-    bottom: 8px !important;
+    bottom: 68px !important;
     right: 8px !important;
     gap: 4px !important;
+    flex-direction: column !important;
+    align-items: flex-end !important;
   }
   .session-buttons button {
     padding: 6px 10px !important;
     font-size: 11px !important;
+  }
+}
+
+/* ── TABLET ───────────────────────────────────────── */
+@media (max-width: 1024px) and (min-width: 769px) {
+  [style*="grid-template-columns: repeat(5"] {
+    grid-template-columns: repeat(3, 1fr) !important;
   }
 }
