@@ -3,11 +3,18 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { CashFlow } from '@/lib/supabase'
-import { formatCOP, formatDateTime, CASH_FLOW_CATEGORY_LABELS } from '@/lib/utils'
+import { formatCOP, formatDateTime, CASH_FLOW_CATEGORY_LABELS, PAYMENT_METHOD_LABELS } from '@/lib/utils'
 import { Wallet, Plus, X, TrendingUp, TrendingDown } from 'lucide-react'
+
+interface SaleByPayment {
+  payment_method: string
+  total: number
+  count: number
+}
 
 export default function FlujoCajaPage() {
   const [flows, setFlows] = useState<CashFlow[]>([])
+  const [salesByPayment, setSalesByPayment] = useState<SaleByPayment[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -20,13 +27,32 @@ export default function FlujoCajaPage() {
     amount: '',
   })
 
-  async function fetchFlows() {
-    const { data } = await supabase.from('cash_flow').select('*').order('flow_date', { ascending: false })
-    setFlows(data ?? [])
+  async function fetchData() {
+    const [flowsRes, salesRes] = await Promise.all([
+      supabase.from('cash_flow').select('*').order('flow_date', { ascending: false }),
+      supabase.from('sales').select('payment_method, total_revenue').eq('status', 'completada'),
+    ])
+
+    setFlows(flowsRes.data ?? [])
+
+    // Agrupar ventas por método de pago
+    const salesData = salesRes.data ?? []
+    const grouped: Record<string, { total: number; count: number }> = {}
+    salesData.forEach(s => {
+      if (!grouped[s.payment_method]) grouped[s.payment_method] = { total: 0, count: 0 }
+      grouped[s.payment_method].total += Number(s.total_revenue)
+      grouped[s.payment_method].count += 1
+    })
+
+    const sorted = Object.entries(grouped)
+      .map(([method, data]) => ({ payment_method: method, ...data }))
+      .sort((a, b) => b.total - a.total)
+
+    setSalesByPayment(sorted)
     setLoading(false)
   }
 
-  useEffect(() => { fetchFlows() }, [])
+  useEffect(() => { fetchData() }, [])
 
   const totalIngresos = flows.filter(f => f.type === 'ingreso').reduce((acc, f) => acc + Number(f.amount), 0)
   const totalEgresos = flows.filter(f => f.type === 'egreso').reduce((acc, f) => acc + Number(f.amount), 0)
@@ -46,7 +72,7 @@ export default function FlujoCajaPage() {
     else {
       setMessage({ type: 'success', text: 'Movimiento registrado exitosamente.' })
       setForm({ type: 'egreso', category: 'otro', description: '', amount: '' })
-      setShowForm(false); fetchFlows()
+      setShowForm(false); fetchData()
     }
     setSaving(false)
   }
@@ -54,6 +80,24 @@ export default function FlujoCajaPage() {
   const egresoCategories = ['compra_inventario', 'impresion', 'imprevisto', 'retiro', 'otro']
   const ingresoCategories = ['venta', 'otro']
   const categories = form.type === 'egreso' ? egresoCategories : ingresoCategories
+
+  const PAYMENT_ICONS: Record<string, string> = {
+    efectivo: '💵',
+    transferencia: '🏦',
+    nequi: '🟣',
+    daviplata: '🔴',
+    otro: '💳',
+  }
+
+  const PAYMENT_COLORS: Record<string, { color: string; bg: string; border: string }> = {
+    efectivo:      { color: '#00ff94', bg: '#00ff940d', border: '#00ff9422' },
+    transferencia: { color: '#00cfff', bg: '#00cfff0d', border: '#00cfff22' },
+    nequi:         { color: '#a78bfa', bg: '#a78bfa0d', border: '#a78bfa22' },
+    daviplata:     { color: '#ff4d4d', bg: '#ff4d4d0d', border: '#ff4d4d22' },
+    otro:          { color: '#ffb547', bg: '#ffb5470d', border: '#ffb54722' },
+  }
+
+  const totalVentas = salesByPayment.reduce((acc, s) => acc + s.total, 0)
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
@@ -96,13 +140,46 @@ export default function FlujoCajaPage() {
         ))}
       </div>
 
+      {/* Desglose por medio de pago */}
+      {salesByPayment.length > 0 && (
+        <div style={{ borderRadius: '16px', padding: '24px', backgroundColor: '#161616', border: '1px solid #1f1f1f' }}>
+          <h2 style={{ margin: '0 0 20px', fontSize: '16px', fontWeight: 700, color: '#f0f0f0' }}>
+            💳 Ingresos por Medio de Pago
+          </h2>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '12px' }}>
+            {['efectivo', 'transferencia', 'nequi', 'daviplata', 'otro'].map(method => {
+              const data = salesByPayment.find(s => s.payment_method === method)
+              const pc = PAYMENT_COLORS[method]
+              const pct = totalVentas > 0 && data ? Math.round((data.total / totalVentas) * 100) : 0
+              return (
+                <div key={method} style={{ borderRadius: '12px', padding: '16px', backgroundColor: data ? pc.bg : '#0d0d0d', border: `1px solid ${data ? pc.border : '#1f1f1f'}` }}>
+                  <div style={{ fontSize: '20px', marginBottom: '8px' }}>{PAYMENT_ICONS[method]}</div>
+                  <p style={{ margin: 0, fontSize: '12px', fontWeight: 600, color: data ? pc.color : '#374151' }}>
+                    {PAYMENT_METHOD_LABELS[method]}
+                  </p>
+                  <p style={{ margin: '6px 0 2px', fontSize: '18px', fontWeight: 900, color: data ? pc.color : '#374151' }}>
+                    {data ? formatCOP(data.total) : '$0'}
+                  </p>
+                  <p style={{ margin: 0, fontSize: '11px', color: '#6b7280' }}>
+                    {data ? `${data.count} venta${data.count !== 1 ? 's' : ''} · ${pct}%` : 'Sin ventas'}
+                  </p>
+                  {data && totalVentas > 0 && (
+                    <div style={{ marginTop: '8px', height: '4px', borderRadius: '2px', backgroundColor: '#2a2a2a', overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: `${pct}%`, backgroundColor: pc.color, borderRadius: '2px', transition: 'width 0.5s ease' }} />
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Formulario */}
       {showForm && (
         <div style={{ borderRadius: '16px', padding: '32px', backgroundColor: '#161616', border: '1px solid #1f1f1f' }}>
           <h2 style={{ margin: '0 0 24px', fontSize: '18px', fontWeight: 700, color: '#f0f0f0' }}>Registrar Movimiento</h2>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-
-            {/* Tipo */}
             <div>
               <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#9ca3af', marginBottom: '8px' }}>Tipo</label>
               <div style={{ display: 'flex', gap: '12px' }}>
@@ -117,8 +194,6 @@ export default function FlujoCajaPage() {
                 ))}
               </div>
             </div>
-
-            {/* Categoría */}
             <div>
               <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#9ca3af', marginBottom: '8px' }}>Categoría</label>
               <select value={form.category} onChange={e => setForm(p => ({ ...p, category: e.target.value }))}
@@ -126,26 +201,19 @@ export default function FlujoCajaPage() {
                 {categories.map(cat => <option key={cat} value={cat}>{CASH_FLOW_CATEGORY_LABELS[cat]}</option>)}
               </select>
             </div>
-
-            {/* Descripción */}
             <div>
               <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#9ca3af', marginBottom: '8px' }}>Descripción *</label>
               <input type="text" value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
                 placeholder="Ej: Compra de 20 tarjetas al proveedor"
-                style={{ width: '100%', padding: '12px 16px', borderRadius: '10px', fontSize: '14px', outline: 'none', backgroundColor: '#0d0d0d', border: '1px solid #2a2a2a', color: '#f0f0f0', boxSizing: 'border-box' }}
-              />
+                style={{ width: '100%', padding: '12px 16px', borderRadius: '10px', fontSize: '14px', outline: 'none', backgroundColor: '#0d0d0d', border: '1px solid #2a2a2a', color: '#f0f0f0', boxSizing: 'border-box' }} />
             </div>
-
-            {/* Monto */}
             <div>
               <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#9ca3af', marginBottom: '8px' }}>Monto (COP) *</label>
               <input type="number" min="1" value={form.amount} onChange={e => setForm(p => ({ ...p, amount: e.target.value }))}
                 placeholder="Ej: 40000"
-                style={{ width: '100%', padding: '12px 16px', borderRadius: '10px', fontSize: '14px', outline: 'none', backgroundColor: '#0d0d0d', border: '1px solid #2a2a2a', color: '#f0f0f0', boxSizing: 'border-box' }}
-              />
+                style={{ width: '100%', padding: '12px 16px', borderRadius: '10px', fontSize: '14px', outline: 'none', backgroundColor: '#0d0d0d', border: '1px solid #2a2a2a', color: '#f0f0f0', boxSizing: 'border-box' }} />
             </div>
           </div>
-
           {message && (
             <div style={{ marginTop: '16px', padding: '12px 16px', borderRadius: '10px', fontSize: '14px',
               backgroundColor: message.type === 'success' ? '#00ff940d' : '#ff4d4d0d',
@@ -154,7 +222,6 @@ export default function FlujoCajaPage() {
               {message.text}
             </div>
           )}
-
           <button onClick={handleSubmit} disabled={saving}
             style={{ marginTop: '24px', padding: '12px 32px', borderRadius: '10px', fontWeight: 700, fontSize: '14px', border: 'none',
               background: saving ? '#2a2a2a' : 'linear-gradient(90deg, #00cfff, #00ff94)',
