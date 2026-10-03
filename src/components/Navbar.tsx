@@ -1,84 +1,151 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { TaplyLogo } from './TaplyLogo'
-import { LayoutDashboard, ShoppingCart, Package, Users, Wallet, CheckSquare, Sparkles, Settings } from 'lucide-react'
+import { LayoutDashboard, ShoppingCart, Package, Users, Wallet, CheckSquare, Sparkles, Settings, ChevronLeft, ChevronRight, Menu } from 'lucide-react'
 
 const navItems = [
-  { href: '/',           label: 'Dashboard',    icon: LayoutDashboard },
-  { href: '/ventas',     label: 'Ventas',        icon: ShoppingCart },
-  { href: '/inventario', label: 'Inventario',    icon: Package },
-  { href: '/clientes',   label: 'Clientes',      icon: Users },
-  { href: '/flujo-caja', label: 'Flujo de Caja', icon: Wallet },
-  { href: '/tareas',     label: 'Tareas',        icon: CheckSquare },
-  { href: '/contenido',  label: 'Contenido',     icon: Sparkles },
+  { href: '/',               label: 'Dashboard',     icon: LayoutDashboard },
+  { href: '/ventas',         label: 'Ventas',         icon: ShoppingCart },
+  { href: '/inventario',     label: 'Inventario',     icon: Package },
+  { href: '/clientes',       label: 'Clientes',       icon: Users },
+  { href: '/flujo-caja',     label: 'Flujo de Caja',  icon: Wallet },
+  { href: '/tareas',         label: 'Tareas',         icon: CheckSquare },
+  { href: '/contenido',      label: 'Contenido',      icon: Sparkles },
 ]
 
 const bottomItems = [
-  { href: '/configuracion', label: 'Configuración', icon: Settings },
+  { href: '/configuracion',  label: 'Configuración',  icon: Settings },
 ]
+
+const SIDEBAR_EXPANDED = 300
+const SIDEBAR_COLLAPSED = 72
 
 export function Navbar() {
   const pathname = usePathname()
+  const [collapsed, setCollapsed] = useState(false)
 
-  const NavLink = ({ href, label, icon: Icon }: { href: string; label: string; icon: React.ElementType }) => {
-    const isActive = pathname === href
-    return (
-      <Link href={href} style={{
-        display: 'flex', alignItems: 'center', gap: '16px',
-        padding: '14px 20px', borderRadius: '12px',
-        fontSize: '14px', fontWeight: isActive ? 600 : 400,
-        textDecoration: 'none', transition: 'all 0.15s ease',
-        backgroundColor: isActive ? '#00cfff0d' : 'transparent',
-        border: isActive ? '1px solid #00cfff22' : '1px solid transparent',
-        color: isActive ? '#00cfff' : '#6b7280',
-      }}>
-        <Icon size={18} style={{ color: isActive ? '#00cfff' : '#4b5563', flexShrink: 0 }} />
-        {label}
-      </Link>
-    )
-  }
+  const width = collapsed ? SIDEBAR_COLLAPSED : SIDEBAR_EXPANDED
 
   return (
-    <aside style={{
-      position: 'fixed', left: 0, top: 0,
-      height: '100vh', width: '300px',
-      backgroundColor: '#111111',
-      borderRight: '1px solid #1f1f1f',
-      display: 'flex', flexDirection: 'column',
-      zIndex: 50,
-    }}>
-      {/* Logo */}
-      <div style={{ padding: '36px 32px', borderBottom: '1px solid #1f1f1f' }}>
-        <TaplyLogo size="md" showText={true} />
-      </div>
+    <>
+      {/* Sidebar */}
+      <aside style={{
+        position: 'fixed', left: 0, top: 0,
+        height: '100vh', width: `${width}px`,
+        backgroundColor: '#111111',
+        borderRight: '1px solid #1f1f1f',
+        display: 'flex', flexDirection: 'column',
+        zIndex: 50, transition: 'width 0.25s ease',
+        overflow: 'hidden',
+      }}>
+        {/* Logo + botón colapsar */}
+        <div style={{ padding: collapsed ? '28px 0' : '32px 28px', borderBottom: '1px solid #1f1f1f', display: 'flex', alignItems: 'center', justifyContent: collapsed ? 'center' : 'space-between', transition: 'padding 0.25s ease' }}>
+          {!collapsed && <TaplyLogo size="sm" showText={true} />}
+          {collapsed && (
+            <button onClick={() => setCollapsed(false)}
+              style={{ padding: '8px', borderRadius: '10px', cursor: 'pointer', backgroundColor: '#00cfff0d', border: '1px solid #00cfff22', color: '#00cfff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Menu size={18} />
+            </button>
+          )}
+          {!collapsed && (
+            <button onClick={() => setCollapsed(true)}
+              style={{ padding: '6px', borderRadius: '8px', cursor: 'pointer', backgroundColor: 'transparent', border: '1px solid #2a2a2a', color: '#4b5563', display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+              <ChevronLeft size={16} />
+            </button>
+          )}
+        </div>
 
-      {/* Label */}
-      <div style={{ padding: '32px 32px 12px' }}>
-        <span style={{ color: '#374151', fontSize: '10px', fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase' }}>
-          Menú Principal
-        </span>
-      </div>
+        {/* Label menú */}
+        {!collapsed && (
+          <div style={{ padding: '28px 28px 10px' }}>
+            <span style={{ color: '#374151', fontSize: '10px', fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase' }}>
+              Menú Principal
+            </span>
+          </div>
+        )}
 
-      {/* Nav principal */}
-      <nav style={{ flex: 1, padding: '0 16px', display: 'flex', flexDirection: 'column', gap: '4px', overflowY: 'auto' }}>
-        {navItems.map(item => <NavLink key={item.href} {...item} />)}
-      </nav>
+        {/* Nav principal */}
+        <nav style={{ flex: 1, padding: collapsed ? '16px 12px' : '8px 16px', display: 'flex', flexDirection: 'column', gap: '4px', overflowY: 'auto' }}>
+          {navItems.map(({ href, label, icon: Icon }) => {
+            const isActive = pathname === href
+            return (
+              <Link key={href} href={href}
+                title={collapsed ? label : undefined}
+                style={{
+                  display: 'flex', alignItems: 'center',
+                  gap: collapsed ? 0 : '14px',
+                  padding: collapsed ? '12px' : '13px 18px',
+                  borderRadius: '12px', fontSize: '14px',
+                  fontWeight: isActive ? 600 : 400,
+                  textDecoration: 'none', transition: 'all 0.15s ease',
+                  justifyContent: collapsed ? 'center' : 'flex-start',
+                  backgroundColor: isActive ? '#00cfff0d' : 'transparent',
+                  border: isActive ? '1px solid #00cfff22' : '1px solid transparent',
+                  color: isActive ? '#00cfff' : '#6b7280',
+                }}>
+                <Icon size={20} style={{ color: isActive ? '#00cfff' : '#4b5563', flexShrink: 0 }} />
+                {!collapsed && label}
+              </Link>
+            )
+          })}
+        </nav>
 
-      {/* Separador */}
-      <div style={{ margin: '0 16px', borderTop: '1px solid #1f1f1f' }} />
+        {/* Separador */}
+        <div style={{ margin: collapsed ? '0 12px' : '0 16px', borderTop: '1px solid #1f1f1f' }} />
 
-      {/* Nav inferior */}
-      <div style={{ padding: '12px 16px' }}>
-        {bottomItems.map(item => <NavLink key={item.href} {...item} />)}
-      </div>
+        {/* Nav inferior */}
+        <div style={{ padding: collapsed ? '12px' : '12px 16px' }}>
+          {bottomItems.map(({ href, label, icon: Icon }) => {
+            const isActive = pathname === href
+            return (
+              <Link key={href} href={href}
+                title={collapsed ? label : undefined}
+                style={{
+                  display: 'flex', alignItems: 'center',
+                  gap: collapsed ? 0 : '14px',
+                  padding: collapsed ? '12px' : '13px 18px',
+                  borderRadius: '12px', fontSize: '14px',
+                  fontWeight: isActive ? 600 : 400,
+                  textDecoration: 'none', transition: 'all 0.15s ease',
+                  justifyContent: collapsed ? 'center' : 'flex-start',
+                  backgroundColor: isActive ? '#00cfff0d' : 'transparent',
+                  border: isActive ? '1px solid #00cfff22' : '1px solid transparent',
+                  color: isActive ? '#00cfff' : '#6b7280',
+                }}>
+                <Icon size={20} style={{ color: isActive ? '#00cfff' : '#4b5563', flexShrink: 0 }} />
+                {!collapsed && label}
+              </Link>
+            )
+          })}
+        </div>
 
-      {/* Footer */}
-      <div style={{ padding: '20px 32px', borderTop: '1px solid #1f1f1f' }}>
-        <p style={{ color: '#374151', fontSize: '12px', fontWeight: 600, margin: 0 }}>Taply Inventory v1.0</p>
-        <p style={{ color: '#1f2937', fontSize: '11px', marginTop: '4px', marginBottom: 0 }}>Sistema de Gestión NFC</p>
-      </div>
-    </aside>
+        {/* Footer */}
+        {!collapsed && (
+          <div style={{ padding: '20px 28px', borderTop: '1px solid #1f1f1f' }}>
+            <p style={{ color: '#374151', fontSize: '12px', fontWeight: 600, margin: 0 }}>Taply Inventory v1.0</p>
+            <p style={{ color: '#1f2937', fontSize: '11px', marginTop: '4px', marginBottom: 0 }}>Sistema de Gestión NFC</p>
+          </div>
+        )}
+
+        {/* Botón expandir (solo cuando colapsado, en el footer) */}
+        {collapsed && (
+          <div style={{ padding: '16px 12px', borderTop: '1px solid #1f1f1f' }}>
+            <button onClick={() => setCollapsed(false)}
+              title="Expandir menú"
+              style={{ width: '100%', padding: '10px', borderRadius: '10px', cursor: 'pointer', backgroundColor: 'transparent', border: '1px solid #2a2a2a', color: '#4b5563', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <ChevronRight size={16} />
+            </button>
+          </div>
+        )}
+      </aside>
+
+      {/* Spacer dinámico para el contenido principal */}
+      <style>{`
+        main { margin-left: ${width}px !important; transition: margin-left 0.25s ease; }
+      `}</style>
+    </>
   )
 }
