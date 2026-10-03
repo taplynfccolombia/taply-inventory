@@ -3,8 +3,8 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { CashFlow } from '@/lib/supabase'
-import { formatCOP, formatDateTime, CASH_FLOW_CATEGORY_LABELS, PAYMENT_METHOD_LABELS } from '@/lib/utils'
-import { Wallet, Plus, X, TrendingUp, TrendingDown } from 'lucide-react'
+import { formatCOP, formatDateTime, CASH_FLOW_CATEGORY_LABELS, PAYMENT_METHOD_LABELS, exportToCSV } from '@/lib/utils'
+import { Wallet, Plus, X, TrendingUp, TrendingDown, Download } from 'lucide-react'
 
 interface SaleByPayment {
   payment_method: string
@@ -32,10 +32,7 @@ export default function FlujoCajaPage() {
       supabase.from('cash_flow').select('*').order('flow_date', { ascending: false }),
       supabase.from('sales').select('payment_method, total_revenue').eq('status', 'completada'),
     ])
-
     setFlows(flowsRes.data ?? [])
-
-    // Agrupar ventas por método de pago
     const salesData = salesRes.data ?? []
     const grouped: Record<string, { total: number; count: number }> = {}
     salesData.forEach(s => {
@@ -43,12 +40,7 @@ export default function FlujoCajaPage() {
       grouped[s.payment_method].total += Number(s.total_revenue)
       grouped[s.payment_method].count += 1
     })
-
-    const sorted = Object.entries(grouped)
-      .map(([method, data]) => ({ payment_method: method, ...data }))
-      .sort((a, b) => b.total - a.total)
-
-    setSalesByPayment(sorted)
+    setSalesByPayment(Object.entries(grouped).map(([method, data]) => ({ payment_method: method, ...data })).sort((a, b) => b.total - a.total))
     setLoading(false)
   }
 
@@ -63,10 +55,8 @@ export default function FlujoCajaPage() {
     if (!form.amount || Number(form.amount) <= 0) { setMessage({ type: 'error', text: 'El monto debe ser mayor a 0.' }); return }
     setSaving(true); setMessage(null)
     const { error } = await supabase.from('cash_flow').insert([{
-      type: form.type,
-      category: form.category,
-      description: form.description.trim(),
-      amount: Number(form.amount),
+      type: form.type, category: form.category,
+      description: form.description.trim(), amount: Number(form.amount),
     }])
     if (error) { setMessage({ type: 'error', text: 'Error al guardar el movimiento.' }) }
     else {
@@ -77,18 +67,22 @@ export default function FlujoCajaPage() {
     setSaving(false)
   }
 
+  function handleExportCSV() {
+    const data = flows.map(f => ({
+      Fecha: formatDateTime(f.flow_date),
+      Tipo: f.type === 'ingreso' ? 'Ingreso' : 'Egreso',
+      Categoría: CASH_FLOW_CATEGORY_LABELS[f.category] ?? f.category,
+      Descripción: f.description,
+      'Monto (COP)': f.type === 'ingreso' ? Number(f.amount) : -Number(f.amount),
+    }))
+    exportToCSV(data, 'Taply_FlujoCaja')
+  }
+
   const egresoCategories = ['compra_inventario', 'impresion', 'imprevisto', 'retiro', 'otro']
   const ingresoCategories = ['venta', 'otro']
   const categories = form.type === 'egreso' ? egresoCategories : ingresoCategories
 
-  const PAYMENT_ICONS: Record<string, string> = {
-    efectivo: '💵',
-    transferencia: '🏦',
-    nequi: '🟣',
-    daviplata: '🔴',
-    otro: '💳',
-  }
-
+  const PAYMENT_ICONS: Record<string, string> = { efectivo: '💵', transferencia: '🏦', nequi: '🟣', daviplata: '🔴', otro: '💳' }
   const PAYMENT_COLORS: Record<string, { color: string; bg: string; border: string }> = {
     efectivo:      { color: '#00ff94', bg: '#00ff940d', border: '#00ff9422' },
     transferencia: { color: '#00cfff', bg: '#00cfff0d', border: '#00cfff22' },
@@ -96,7 +90,6 @@ export default function FlujoCajaPage() {
     daviplata:     { color: '#ff4d4d', bg: '#ff4d4d0d', border: '#ff4d4d22' },
     otro:          { color: '#ffb547', bg: '#ffb5470d', border: '#ffb54722' },
   }
-
   const totalVentas = salesByPayment.reduce((acc, s) => acc + s.total, 0)
 
   return (
@@ -106,17 +99,21 @@ export default function FlujoCajaPage() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
           <h1 style={{ margin: 0, fontSize: '32px', fontWeight: 900 }} className="taply-gradient-text">Flujo de Caja</h1>
-          <p style={{ margin: '6px 0 0', fontSize: '14px', color: '#6b7280' }}>
-            Registro de ingresos, egresos e imprevistos
-          </p>
+          <p style={{ margin: '6px 0 0', fontSize: '14px', color: '#6b7280' }}>Registro de ingresos, egresos e imprevistos</p>
         </div>
-        <button onClick={() => { setShowForm(!showForm); setMessage(null) }}
-          style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 20px', borderRadius: '12px', fontWeight: 700, fontSize: '14px', cursor: 'pointer', border: 'none',
-            background: showForm ? '#1f1f1f' : 'linear-gradient(90deg, #00cfff, #00ff94)',
-            color: showForm ? '#9ca3af' : '#0d0d0d' }}>
-          {showForm ? <X size={16} /> : <Plus size={16} />}
-          {showForm ? 'Cancelar' : 'Nuevo Movimiento'}
-        </button>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button onClick={handleExportCSV} disabled={flows.length === 0}
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 18px', borderRadius: '12px', fontWeight: 600, fontSize: '13px', cursor: flows.length === 0 ? 'not-allowed' : 'pointer', border: '1px solid #2a2a2a', backgroundColor: 'transparent', color: '#6b7280' }}>
+            <Download size={15} /> CSV
+          </button>
+          <button onClick={() => { setShowForm(!showForm); setMessage(null) }}
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 20px', borderRadius: '12px', fontWeight: 700, fontSize: '14px', cursor: 'pointer', border: 'none',
+              background: showForm ? '#1f1f1f' : 'linear-gradient(90deg, #00cfff, #00ff94)',
+              color: showForm ? '#9ca3af' : '#0d0d0d' }}>
+            {showForm ? <X size={16} /> : <Plus size={16} />}
+            {showForm ? 'Cancelar' : 'Nuevo Movimiento'}
+          </button>
+        </div>
       </div>
 
       {/* KPI Cards */}
@@ -125,10 +122,9 @@ export default function FlujoCajaPage() {
           { label: 'Total Ingresos', value: formatCOP(totalIngresos), color: '#00ff94', bg: '#00ff940d', border: '#00ff9422', icon: TrendingUp },
           { label: 'Total Egresos',  value: formatCOP(totalEgresos),  color: '#ff4d4d', bg: '#ff4d4d0d', border: '#ff4d4d22', icon: TrendingDown },
           { label: 'Balance Neto',   value: formatCOP(balance),
-            color:  balance >= 0 ? '#00cfff' : '#ff4d4d',
-            bg:     balance >= 0 ? '#00cfff0d' : '#ff4d4d0d',
-            border: balance >= 0 ? '#00cfff22' : '#ff4d4d22',
-            icon: Wallet },
+            color: balance >= 0 ? '#00cfff' : '#ff4d4d',
+            bg:    balance >= 0 ? '#00cfff0d' : '#ff4d4d0d',
+            border:balance >= 0 ? '#00cfff22' : '#ff4d4d22', icon: Wallet },
         ].map(({ label, value, color, bg, border, icon: Icon }) => (
           <div key={label} style={{ borderRadius: '16px', padding: '28px', backgroundColor: bg, border: `1px solid ${border}` }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
@@ -143,9 +139,7 @@ export default function FlujoCajaPage() {
       {/* Desglose por medio de pago */}
       {salesByPayment.length > 0 && (
         <div style={{ borderRadius: '16px', padding: '24px', backgroundColor: '#161616', border: '1px solid #1f1f1f' }}>
-          <h2 style={{ margin: '0 0 20px', fontSize: '16px', fontWeight: 700, color: '#f0f0f0' }}>
-            💳 Ingresos por Medio de Pago
-          </h2>
+          <h2 style={{ margin: '0 0 20px', fontSize: '16px', fontWeight: 700, color: '#f0f0f0' }}>💳 Ingresos por Medio de Pago</h2>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '12px' }}>
             {['efectivo', 'transferencia', 'nequi', 'daviplata', 'otro'].map(method => {
               const data = salesByPayment.find(s => s.payment_method === method)
@@ -154,15 +148,9 @@ export default function FlujoCajaPage() {
               return (
                 <div key={method} style={{ borderRadius: '12px', padding: '16px', backgroundColor: data ? pc.bg : '#0d0d0d', border: `1px solid ${data ? pc.border : '#1f1f1f'}` }}>
                   <div style={{ fontSize: '20px', marginBottom: '8px' }}>{PAYMENT_ICONS[method]}</div>
-                  <p style={{ margin: 0, fontSize: '12px', fontWeight: 600, color: data ? pc.color : '#374151' }}>
-                    {PAYMENT_METHOD_LABELS[method]}
-                  </p>
-                  <p style={{ margin: '6px 0 2px', fontSize: '18px', fontWeight: 900, color: data ? pc.color : '#374151' }}>
-                    {data ? formatCOP(data.total) : '$0'}
-                  </p>
-                  <p style={{ margin: 0, fontSize: '11px', color: '#6b7280' }}>
-                    {data ? `${data.count} venta${data.count !== 1 ? 's' : ''} · ${pct}%` : 'Sin ventas'}
-                  </p>
+                  <p style={{ margin: 0, fontSize: '12px', fontWeight: 600, color: data ? pc.color : '#374151' }}>{PAYMENT_METHOD_LABELS[method]}</p>
+                  <p style={{ margin: '6px 0 2px', fontSize: '18px', fontWeight: 900, color: data ? pc.color : '#374151' }}>{data ? formatCOP(data.total) : '$0'}</p>
+                  <p style={{ margin: 0, fontSize: '11px', color: '#6b7280' }}>{data ? `${data.count} venta${data.count !== 1 ? 's' : ''} · ${pct}%` : 'Sin ventas'}</p>
                   {data && totalVentas > 0 && (
                     <div style={{ marginTop: '8px', height: '4px', borderRadius: '2px', backgroundColor: '#2a2a2a', overflow: 'hidden' }}>
                       <div style={{ height: '100%', width: `${pct}%`, backgroundColor: pc.color, borderRadius: '2px', transition: 'width 0.5s ease' }} />

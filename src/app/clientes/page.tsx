@@ -4,8 +4,8 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import type { Client } from '@/lib/supabase'
-import { formatDate } from '@/lib/utils'
-import { Users, Plus, X, Search, Trash2, ChevronRight } from 'lucide-react'
+import { formatDate, exportToCSV } from '@/lib/utils'
+import { Users, Plus, X, Search, Trash2, ChevronRight, Download } from 'lucide-react'
 
 export default function ClientesPage() {
   const router = useRouter()
@@ -55,6 +55,19 @@ export default function ClientesPage() {
     setDeletingId(null); setConfirmDelete(null)
   }
 
+  function handleExportCSV() {
+    const data = clients.map(c => ({
+      Nombre: c.full_name,
+      Empresa: c.company ?? '',
+      Email: c.email ?? '',
+      Teléfono: c.phone ?? '',
+      Ciudad: c.city ?? '',
+      Notas: c.notes ?? '',
+      'Fecha Registro': formatDate(c.created_at),
+    }))
+    exportToCSV(data, 'Taply_Clientes')
+  }
+
   const filtered = clients.filter(c =>
     c.full_name.toLowerCase().includes(search.toLowerCase()) ||
     (c.company ?? '').toLowerCase().includes(search.toLowerCase()) ||
@@ -72,13 +85,19 @@ export default function ClientesPage() {
             {clients.length} cliente{clients.length !== 1 ? 's' : ''} registrado{clients.length !== 1 ? 's' : ''}
           </p>
         </div>
-        <button onClick={() => { setShowForm(!showForm); setMessage(null) }}
-          style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 20px', borderRadius: '12px', fontWeight: 700, fontSize: '14px', cursor: 'pointer', border: 'none',
-            background: showForm ? '#1f1f1f' : 'linear-gradient(90deg, #00cfff, #00ff94)',
-            color: showForm ? '#9ca3af' : '#0d0d0d' }}>
-          {showForm ? <X size={16} /> : <Plus size={16} />}
-          {showForm ? 'Cancelar' : 'Nuevo Cliente'}
-        </button>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button onClick={handleExportCSV} disabled={clients.length === 0}
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 18px', borderRadius: '12px', fontWeight: 600, fontSize: '13px', cursor: clients.length === 0 ? 'not-allowed' : 'pointer', border: '1px solid #2a2a2a', backgroundColor: 'transparent', color: '#6b7280' }}>
+            <Download size={15} /> CSV
+          </button>
+          <button onClick={() => { setShowForm(!showForm); setMessage(null) }}
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 20px', borderRadius: '12px', fontWeight: 700, fontSize: '14px', cursor: 'pointer', border: 'none',
+              background: showForm ? '#1f1f1f' : 'linear-gradient(90deg, #00cfff, #00ff94)',
+              color: showForm ? '#9ca3af' : '#0d0d0d' }}>
+            {showForm ? <X size={16} /> : <Plus size={16} />}
+            {showForm ? 'Cancelar' : 'Nuevo Cliente'}
+          </button>
+        </div>
       </div>
 
       {/* Formulario */}
@@ -99,8 +118,7 @@ export default function ClientesPage() {
                 <input type="text" value={form[key as keyof typeof form]}
                   onChange={e => setForm(p => ({ ...p, [key]: e.target.value }))}
                   placeholder={placeholder}
-                  style={{ width: '100%', padding: '12px 16px', borderRadius: '10px', fontSize: '14px', outline: 'none', backgroundColor: '#0d0d0d', border: '1px solid #2a2a2a', color: '#f0f0f0', boxSizing: 'border-box' }}
-                />
+                  style={{ width: '100%', padding: '12px 16px', borderRadius: '10px', fontSize: '14px', outline: 'none', backgroundColor: '#0d0d0d', border: '1px solid #2a2a2a', color: '#f0f0f0', boxSizing: 'border-box' }} />
               </div>
             ))}
           </div>
@@ -136,8 +154,7 @@ export default function ClientesPage() {
         <Search size={16} style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: '#6b7280' }} />
         <input type="text" value={search} onChange={e => setSearch(e.target.value)}
           placeholder="Buscar por nombre, empresa o email..."
-          style={{ width: '100%', padding: '14px 16px 14px 44px', borderRadius: '12px', fontSize: '14px', outline: 'none', backgroundColor: '#161616', border: '1px solid #1f1f1f', color: '#f0f0f0', boxSizing: 'border-box' }}
-        />
+          style={{ width: '100%', padding: '14px 16px 14px 44px', borderRadius: '12px', fontSize: '14px', outline: 'none', backgroundColor: '#161616', border: '1px solid #1f1f1f', color: '#f0f0f0', boxSizing: 'border-box' }} />
       </div>
 
       {/* Tabla */}

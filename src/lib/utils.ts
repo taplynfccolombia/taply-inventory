@@ -123,3 +123,34 @@ Recuerda que las actualizaciones de tu perfil están incluidas en el servicio. �
 
 — Equipo Taply NFC`
 }
+
+// ── Exportar CSV ─────────────────────────────────────────────────
+
+export function exportToCSV(data: Record<string, unknown>[], filename: string) {
+  if (data.length === 0) return
+
+  const headers = Object.keys(data[0])
+  const csvContent = [
+    headers.join(','),
+    ...data.map(row =>
+      headers.map(header => {
+        const value = row[header]
+        const str = value === null || value === undefined ? '' : String(value)
+        // Escapar comillas y envolver en comillas si contiene coma o salto de línea
+        return str.includes(',') || str.includes('\n') || str.includes('"')
+          ? `"${str.replace(/"/g, '""')}"`
+          : str
+      }).join(',')
+    )
+  ].join('\n')
+
+  const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `${filename}_${new Date().toISOString().split('T')[0]}.csv`
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
+}
