@@ -1,0 +1,431 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import { supabase } from '@/lib/supabase'
+import { useIsMobile } from '@/lib/hooks'
+import { Sparkles, RefreshCw, Check, Calendar, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Loader2, Copy } from 'lucide-react'
+
+interface ContentPost {
+  id: string
+  week_start: string
+  day_index: number
+  day_name: string
+  platform: 'Instagram' | 'TikTok' | 'Pauta'
+  format: 'Imagen Única' | 'Carrusel' | 'Historia'
+  topic: string
+  image_description: string
+  prompt_chatgpt: string
+  caption_idea: string
+  hashtags: string
+  status: 'pendiente' | 'publicado'
+}
+
+const PLATFORM_CONFIG = {
+  Instagram: { color: '#e1306c', bg: '#e1306c0d', border: '#e1306c22', emoji: '📸' },
+  TikTok:    { color: '#00f2ea', bg: '#00f2ea0d', border: '#00f2ea22', emoji: '🎵' },
+  Pauta:     { color: '#fbbf24', bg: '#fbbf240d', border: '#fbbf2422', emoji: '📢' },
+}
+
+const FORMAT_CONFIG = {
+  'Imagen Única': { emoji: '🖼️', desc: '1080x1080px' },
+  'Carrusel':     { emoji: '🎠', desc: '5-8 slides' },
+  'Historia':     { emoji: '📱', desc: '1080x1920px' },
+}
+
+const CONTENT_BANK = [
+  // ── INSTAGRAM ──────────────────────────────────────────────────────────────
+  {
+    platform: 'Instagram', format: 'Imagen Única',
+    topic: 'El tap que cambia todo',
+    image_description: 'Fondo negro matte. Mano elegante sosteniendo una tarjeta Taply negra. Efecto de onda cyan emanando del centro de la tarjeta. Texto inferior: "Un tap. Tu mundo completo." Logo Taply abajo a la derecha.',
+    prompt_chatgpt: 'Flat lay product photo on matte black surface. A sleek black NFC business card centered in frame with cyan neon glow radiating outward in concentric circles. The card has a subtle gradient from deep black to dark charcoal. Minimalist composition, dramatic studio lighting from above, ultra sharp, 4K, commercial product photography style. Text overlay area at bottom 20% of image. Color palette: black, cyan #00CFFF, white.',
+    caption_idea: '¿Todavía regalas tarjetas que nadie guarda? Un solo tap y tu contacto queda guardado para siempre. 🖤',
+    hashtags: '#TaplyNFC #TarjetasNFC #NetworkingColombia #TechColombia #Emprendimiento',
+  },
+  {
+    platform: 'Instagram', format: 'Carrusel',
+    topic: '5 razones para dejar las tarjetas de papel',
+    image_description: 'Slide 1 (Hook): Fondo negro, título grande "¿Aún usas tarjetas de papel?" en blanco, subtítulo cyan "Desliza y descubre por qué es un error". Slides 2-6: cada uno con un ícono simple en cyan, una razón en texto blanco grande, fondo negro. Slide final: CTA "Pide tu Taply hoy" con logo.',
+    prompt_chatgpt: 'Series of 6 minimalist social media slides, 1080x1080px each. Consistent design: matte black background, white bold typography, cyan (#00CFFF) accent icons and highlights. Slide 1: Large provocative headline text. Slides 2-6: Single centered icon with one line of text. Final slide: centered logo and call to action. Clean, modern, tech aesthetic. No gradients except subtle vignette. Swiss design influence.',
+    caption_idea: 'La tarjeta de papel tuya tiene fecha de vencimiento. La Taply no. Desliza y te cuento por qué.',
+    hashtags: '#TaplyNFC #Networking #TarjetasInteligentes #Colombia #Emprendedor',
+  },
+  {
+    platform: 'Instagram', format: 'Historia',
+    topic: 'Encuesta: ¿tarjeta física o digital?',
+    image_description: 'Fondo negro matte. Parte superior: ícono de tarjeta de papel tachada en rojo vs ícono de tarjeta NFC con brillo cyan. Centro: texto "¿Cuál usas tú?" en blanco tamaño grande. Parte inferior: dos opciones para la encuesta de Instagram "📄 Papel" y "⚡ NFC". Colores: negro, blanco, cyan.',
+    prompt_chatgpt: 'Minimalist Instagram Story template, 1080x1920px. Matte black background. Top third: two icons side by side — left: paper card with red X overlay, right: sleek black NFC card with cyan glow. Center: bold white question text. Bottom third: two rounded rectangle poll option buttons in dark gray with white text. Modern, clean, high contrast. Space left for Instagram poll sticker overlay.',
+    caption_idea: 'Vota y cuéntanos 👇 Spoiler: los que respondieron NFC ya tienen su Taply.',
+    hashtags: '#TaplyNFC #Encuesta #NFC #Colombia',
+  },
+  {
+    platform: 'Instagram', format: 'Carrusel',
+    topic: 'Taply para diferentes profesiones',
+    image_description: 'Slide 1: "¿Cuál es tu profesión?" fondo negro, texto blanco. Slides siguientes: cada profesión con su ícono (médico, abogado, chef, agente inmobiliario, diseñador) y cómo usa Taply. Cada slide con color de acento cyan y fondo negro. Slide final: "Cualquier profesión. Un solo tap." con logo Taply.',
+    prompt_chatgpt: 'Professional carousel design series, 1080x1080px per slide. Matte black background throughout. Each slide features: one large minimalist profession icon in cyan (#00CFFF), profession name in white bold, and one sentence describing their Taply use case. Consistent grid layout, geometric sans-serif typography, subtle cyan glow on icons. Final slide: Taply logo centered with tagline. Commercial tech brand aesthetic.',
+    caption_idea: 'No importa a qué te dediques — Taply se adapta a tu mundo profesional. ¿Cuál eres tú? 👇',
+    hashtags: '#TaplyNFC #Profesionales #NFC #Networking #Colombia',
+  },
+  {
+    platform: 'Instagram', format: 'Imagen Única',
+    topic: 'Info siempre actualizada',
+    image_description: 'Dos tarjetas de presentación en comparación. Izquierda: tarjeta de papel arrugada con un número tachado. Derecha: tarjeta Taply negra brillante con ícono de edición cyan. Texto: "Tu info cambia. Tu Taply también." Fondo negro, iluminación dramática.',
+    prompt_chatgpt: 'Split composition product photo on matte black surface. Left side: crumpled white paper business card with crossed out phone number, warm dim light. Right side: sleek black NFC card with subtle cyan glow and edit icon, bright clean light. Dramatic contrast between old and new. Center: thin cyan dividing line. Bottom: space for text overlay. Ultra realistic, commercial photography style, 4K.',
+    caption_idea: '¿Cambiaste de número, empresa o redes? Avísanos y actualizamos tu Taply sin costo. Así de fácil. ✅',
+    hashtags: '#TaplyNFC #Servicio #NFC #TechFacil #Colombia',
+  },
+  {
+    platform: 'Instagram', format: 'Historia',
+    topic: 'Precio vs valor de Taply',
+    image_description: 'Fondo negro. Arriba: "200 tarjetas de papel x 3 veces al año" con ícono de dinero en rojo. Abajo separado por línea cyan: "1 Taply para siempre" con ícono de infinito en cyan. Texto final: "¿Cuál es la inversión inteligente?" en blanco.',
+    prompt_chatgpt: 'Minimalist Instagram Story infographic, 1080x1920px. Matte black background. Top half: red toned section showing stack of paper cards with money symbols, bold white text showing cost calculation. Cyan horizontal divider line in center. Bottom half: single sleek black NFC card with infinity symbol in cyan, white text showing one-time investment. Clean bold typography, high contrast, no clutter.',
+    caption_idea: 'Haz las matemáticas. La Taply se paga sola en el primer mes. 💡',
+    hashtags: '#TaplyNFC #InversionInteligente #Emprendimiento #Colombia',
+  },
+
+  // ── TIKTOK ─────────────────────────────────────────────────────────────────
+  {
+    platform: 'TikTok', format: 'Imagen Única',
+    topic: 'El tap más rápido del oeste',
+    image_description: 'Fondo negro. Mano sosteniendo un iPhone acercándose a una tarjeta Taply. Efecto de velocidad/motion blur en la mano. Texto grande: "0.3 segundos. Tu contacto guardado." en cyan. Estética cruda y directa estilo TikTok.',
+    prompt_chatgpt: 'Dynamic action shot, 1080x1080px, TikTok aesthetic. Matte black background. Close up of hand holding iPhone approaching black NFC card. Motion blur effect on hand suggesting speed. Cyan electric spark effect at contact point. Bold oversized white text at top. High energy, raw, authentic feel. Slight film grain overlay. Contrast: 90%, Saturation: slightly desaturated except cyan elements.',
+    caption_idea: 'Más rápido que buscar tu tarjeta en la billetera. ⚡ #TaplyNFC',
+    hashtags: '#TaplyNFC #NFC #Tech #Networking #Colombia #Viral',
+  },
+  {
+    platform: 'TikTok', format: 'Carrusel',
+    topic: 'Antes y después del networking',
+    image_description: 'Slide 1: "ANTES de Taply" — billetera explotada de tarjetas arrugadas, colores apagados. Slide 2: "DESPUÉS de Taply" — mano limpia con una sola tarjeta negra brillante, efecto cyan. Slide 3: "El resultado" — estadísticas ficticias de contactos guardados. Slide 4: CTA directo.',
+    prompt_chatgpt: 'Before/after carousel series for TikTok, 1080x1080px. Slide 1: Desaturated, cluttered wallet overflowing with crumpled business cards, dim lighting, chaotic composition. Slide 2: Clean matte black surface, single sleek NFC card with cyan neon glow, dramatic spotlight. Slide 3: Minimalist stats infographic in black and cyan. Slide 4: Bold CTA text on black. Consistent border frame on all slides for carousel continuity.',
+    caption_idea: 'El networking en 2026 ya no se hace con papeles. Te lo demuestro 👇',
+    hashtags: '#TaplyNFC #AntesYDespues #Networking #TikTokColombia #Tech',
+  },
+  {
+    platform: 'TikTok', format: 'Historia',
+    topic: 'POV: eres el único con NFC en el evento',
+    image_description: 'Fondo negro con texto estilo subtítulo de TikTok. Texto grande: "POV: Sacas tu Taply en un evento de networking" seguido de "y todos te preguntan qué es eso 😏". Estética de texto en pantalla estilo TikTok nativo. Colores blanco y cyan sobre negro.',
+    prompt_chatgpt: 'TikTok native text-style Story image, 1080x1920px. Matte black background. Large white bold text at top: "POV:" followed by scenario text in smaller white. Center: sleek black NFC card floating with cyan glow and small question mark icons floating around it in white. Bottom: reaction emoji. Authentic TikTok aesthetic, slightly raw, bold typography like TikTok captions. Minimal design.',
+    caption_idea: 'Y ahí empieza la conversación 😏 ¿Ya tienes la tuya? #TaplyNFC',
+    hashtags: '#POV #TaplyNFC #NFC #Networking #TikTokColombia #Viral',
+  },
+  {
+    platform: 'TikTok', format: 'Imagen Única',
+    topic: 'Duelo: papel vs NFC en velocidad',
+    image_description: 'Imagen dividida al centro. Izquierda: cronómetro en 45 segundos sobre imagen de persona buscando tarjeta. Derecha: cronómetro en 0.3 segundos sobre tap NFC con efecto cyan. Texto central: "VS" en grande. Fondo negro oscuro.',
+    prompt_chatgpt: 'Split screen comparison image, 1080x1080px. Matte black background. Left half (warm dim light): stopwatch showing 45 seconds, person frantically searching wallet for paper card, slightly blurred chaotic energy. Right half (cool cyan light): stopwatch showing 0.3 seconds, single NFC card with electric cyan tap effect, clean and sharp. Bold "VS" text centered in white. High contrast, dramatic lighting. TikTok native style.',
+    caption_idea: 'Comentarios de "papel" vs "NFC" 👇 Veamos quién gana.',
+    hashtags: '#TaplyNFC #Duelo #NFC #Colombia #Networking #TikTok',
+  },
+  {
+    platform: 'TikTok', format: 'Carrusel',
+    topic: '5 personas que NECESITAN Taply',
+    image_description: 'Slide 1: "Si haces esto, necesitas Taply 🧵" texto grande blanco en negro. Slides 2-6: cada uno con profesión/situación, ícono grande cyan y texto directo estilo TikTok. Slide final: "¿Eres tú? Escríbenos 👇"',
+    prompt_chatgpt: 'TikTok carousel series, 1080x1080px per slide. Consistent matte black background. Slide 1: Large hook text in bold white. Each following slide: oversized cyan emoji/icon centered, bold white profession name below, one-line description in gray. Raw TikTok energy, slightly imperfect alignment for authenticity, bold sans-serif font. Final slide: white CTA text with arrow pointing down. Thread-style visual storytelling.',
+    caption_idea: '¿Cuál eres tú? 1, 2, 3, 4 o 5 en comentarios 👇',
+    hashtags: '#TaplyNFC #NFC #Para #Profesionales #TikTokColombia',
+  },
+  {
+    platform: 'TikTok', format: 'Historia',
+    topic: '¿Tu Taply funciona sin internet?',
+    image_description: 'Fondo negro. Grande y centrado: "❌ MITO" en rojo. Abajo: "Tu Taply NO necesita internet" en blanco grande. Sub-texto en cyan: "Solo el teléfono de quien recibe el tap". Parte inferior: ícono de NFC con onda cyan. Estética educativa estilo TikTok.',
+    prompt_chatgpt: 'Educational myth-busting TikTok Story, 1080x1920px. Matte black background. Top: large red "MITO" text with X symbol. Center: bold white explanatory text in two lines. Below: cyan NFC wave icon. Bottom: supporting detail text in light gray. Clean typographic hierarchy, TikTok educational content style, slight glow on cyan elements. No photos, pure text and icon design.',
+    caption_idea: 'La pregunta que todos hacen 👆 Comparte para que lo sepa tu red.',
+    hashtags: '#TaplyNFC #MitoVsRealidad #NFC #TechTips #Colombia',
+  },
+
+  // ── PAUTA PUBLICITARIA ──────────────────────────────────────────────────────
+  {
+    platform: 'Pauta', format: 'Imagen Única',
+    topic: 'Anuncio de conversión — WhatsApp',
+    image_description: 'Imagen de producto limpia y directa. Centro: tarjeta Taply negra sobre superficie oscura con efecto de luz cyan puntual. Texto izquierda: "Tu tarjeta de presentación NFC" en blanco. Subtexto: "Hecha a mano · Siempre actualizada · Un solo tap" en gris. CTA botón: "Escríbenos por WhatsApp" en cyan. Logo Taply arriba derecha.',
+    prompt_chatgpt: 'Professional paid advertisement image, 1080x1080px. Matte black background with subtle texture. Center: sleek black NFC business card in dramatic product photography lighting — single spotlight from above creating sharp shadow. Left side: clean white bold headline text, gray supporting text below in 3 bullet points. Bottom right: rounded cyan CTA button shape with white text. Top right corner: small logo space. Ultra clean, conversion-optimized layout, luxury tech product feel. No clutter.',
+    caption_idea: 'Tu primera impresión merece ser inolvidable. Tarjetas NFC hechas a mano en Colombia. Un tap y comparten todo tu mundo profesional.',
+    hashtags: '#TaplyNFC #NFC #Colombia',
+  },
+  {
+    platform: 'Pauta', format: 'Carrusel',
+    topic: 'Anuncio carrusel — problema y solución',
+    image_description: 'Slide 1 (thumb): Fondo negro, texto impactante "¿Cuántos contactos perdiste hoy por no tener tus datos a mano?" en blanco, flecha deslizar en cyan. Slide 2: El problema — imagen de tarjetas arrugadas. Slide 3: La solución — Taply con efecto de tap. Slide 4: Beneficios en bullets. Slide 5: Precio y CTA final con botón WhatsApp.',
+    prompt_chatgpt: 'Paid social media carousel ad, 1080x1080px per slide, 5 slides. Slide 1: Dark dramatic background, large white rhetorical question text, cyan swipe arrow. Slide 2: Desaturated photo of cluttered crumpled business cards on dark surface — problem visualization. Slide 3: Clean product shot of black NFC card with cyan tap glow — solution reveal. Slide 4: Minimalist bullet points on black, cyan check icons. Slide 5: Pricing section with black background, white price text, prominent cyan rounded CTA button. Consistent luxury tech brand aesthetic throughout.',
+    caption_idea: 'Desliza y descubre por qué más de 100 profesionales en Colombia ya usan Taply. 👉',
+    hashtags: '#TaplyNFC #NFC #Networking #Colombia',
+  },
+  {
+    platform: 'Pauta', format: 'Historia',
+    topic: 'Anuncio historia — urgencia y CTA',
+    image_description: 'Historia vertical 1080x1920. Tercio superior: logo Taply pequeño centrado. Centro: pregunta grande "¿Sigues perdiendo contactos valiosos?" en blanco sobre negro. Abajo: beneficio en 3 líneas cortas con íconos cyan. Tercio inferior: fondo cyan con texto negro "Pide la tuya hoy →" como CTA prominente.',
+    prompt_chatgpt: 'Vertical paid Story advertisement, 1080x1920px. Three visual zones on matte black background: Top zone (20%): small centered logo on black. Middle zone (50%): large bold white question headline, below it three benefit lines each with cyan checkmark icon and white text. Bottom zone (30%): solid cyan (#00CFFF) background rectangle with bold black CTA text and arrow. Sharp edge between black and cyan sections. Clean, direct, conversion-focused design. No stock photos, pure graphic design.',
+    caption_idea: 'Cada evento es una oportunidad. No la dejes pasar sin tu Taply.',
+    hashtags: '#TaplyNFC #NFC #Colombia',
+  },
+  {
+    platform: 'Pauta', format: 'Imagen Única',
+    topic: 'Anuncio reconocimiento de marca',
+    image_description: 'Imagen minimalista de marca. Centro absoluto: logo Taply grande con gradiente cyan-verde. Debajo: tagline "La tarjeta que nunca se acaba" en blanco. Fondo negro completamente liso. Sin texto adicional. Imagen de branding puro para reconocimiento.',
+    prompt_chatgpt: 'Minimalist brand awareness advertisement, 1080x1080px. Pure matte black background, no texture. Center: large NFC business card shown at slight angle with dramatic product lighting, card is deep black with subtle sheen. Below card: brand logo in cyan-to-green gradient. Under logo: short tagline in clean white sans-serif. Absolute minimalism, luxury brand aesthetic similar to Apple ads. Generous white space (black space). Single light source creating elegant shadow.',
+    caption_idea: 'Taply. La tarjeta que nunca se acaba, nunca se pierde y siempre impresiona.',
+    hashtags: '#TaplyNFC #Branding #NFC #Colombia #Networking',
+  },
+]
+
+function shuffleArray<T>(array: T[]): T[] {
+  const arr = [...array]
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]]
+  }
+  return arr
+}
+
+function selectBalancedWeek(bank: typeof CONTENT_BANK) {
+  const platforms = ['Instagram', 'TikTok', 'Pauta'] as const
+  const result: typeof CONTENT_BANK = []
+  const used = new Set<number>()
+  for (const platform of platforms) {
+    const options = bank.map((item, idx) => ({ item, idx })).filter(({ item, idx }) => item.platform === platform && !used.has(idx))
+    const shuffled = shuffleArray(options)
+    const take = platform === 'Pauta' ? 1 : 3
+    for (let i = 0; i < take && i < shuffled.length; i++) {
+      result.push(shuffled[i].item)
+      used.add(shuffled[i].idx)
+    }
+  }
+  return shuffleArray(result)
+}
+
+function getWeekStart(date: Date): Date {
+  const d = new Date(date)
+  const day = d.getDay()
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1)
+  d.setDate(diff)
+  d.setHours(0, 0, 0, 0)
+  return d
+}
+
+function formatWeekDate(dateStr: string): string {
+  const d = new Date(dateStr + 'T00:00:00')
+  const end = new Date(d)
+  end.setDate(end.getDate() + 6)
+  return `${d.toLocaleDateString('es-CO', { day: 'numeric', month: 'short' })} – ${end.toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' })}`
+}
+
+const DAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
+
+export default function ContenidoPage() {
+  const isMobile = useIsMobile()
+  const [posts, setPosts] = useState<ContentPost[]>([])
+  const [loading, setLoading] = useState(true)
+  const [generating, setGenerating] = useState(false)
+  const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [weekStart, setWeekStart] = useState(() => getWeekStart(new Date()).toISOString().split('T')[0])
+  const [activeTab, setActiveTab] = useState<'Instagram' | 'TikTok' | 'Pauta'>('Instagram')
+
+  async function fetchPosts(week: string) {
+    setLoading(true)
+    const { data } = await supabase.from('content_board').select('*').eq('week_start', week).order('day_index')
+    setPosts(data ?? [])
+    setLoading(false)
+  }
+
+  useEffect(() => { fetchPosts(weekStart) }, [weekStart])
+
+  async function generateWeek() {
+    setGenerating(true)
+    setExpandedId(null)
+    const selected = selectBalancedWeek(CONTENT_BANK)
+    await supabase.from('content_board').delete().eq('week_start', weekStart)
+    await supabase.from('content_board').insert(
+      selected.map((item, i) => ({
+        week_start: weekStart,
+        day_index: i,
+        day_name: DAYS[i] ?? `Día ${i + 1}`,
+        platform: item.platform,
+        format: item.format,
+        topic: item.topic,
+        image_description: item.image_description,
+        prompt_chatgpt: item.prompt_chatgpt,
+        caption_idea: item.caption_idea,
+        hashtags: item.hashtags,
+        status: 'pendiente',
+      }))
+    )
+    await fetchPosts(weekStart)
+    setGenerating(false)
+  }
+
+  async function toggleStatus(post: ContentPost) {
+    const newStatus = post.status === 'pendiente' ? 'publicado' : 'pendiente'
+    await supabase.from('content_board').update({ status: newStatus }).eq('id', post.id)
+    fetchPosts(weekStart)
+  }
+
+  function copyPrompt(post: ContentPost) {
+    navigator.clipboard.writeText(post.prompt_chatgpt)
+    setCopiedId(post.id)
+    setTimeout(() => setCopiedId(null), 2000)
+  }
+
+  function prevWeek() {
+    const d = new Date(weekStart + 'T00:00:00')
+    d.setDate(d.getDate() - 7)
+    setWeekStart(d.toISOString().split('T')[0])
+    setExpandedId(null)
+  }
+
+  function nextWeek() {
+    const d = new Date(weekStart + 'T00:00:00')
+    d.setDate(d.getDate() + 7)
+    setWeekStart(d.toISOString().split('T')[0])
+    setExpandedId(null)
+  }
+
+  const isCurrentWeek = weekStart === getWeekStart(new Date()).toISOString().split('T')[0]
+  const filteredPosts = posts.filter(p => p.platform === activeTab)
+  const publishedCount = posts.filter(p => p.status === 'publicado').length
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+
+      {/* Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
+        <div>
+          <h1 style={{ margin: 0, fontSize: isMobile ? '24px' : '32px', fontWeight: 900 }} className="taply-gradient-text">Contenido</h1>
+          <p style={{ margin: '4px 0 0', fontSize: '13px', color: '#6b7280' }}>Imágenes para Instagram, TikTok y Pautas publicitarias</p>
+        </div>
+        <button onClick={generateWeek} disabled={generating}
+          style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px', borderRadius: '12px', fontWeight: 700, fontSize: '13px', cursor: generating ? 'not-allowed' : 'pointer', border: 'none', background: generating ? '#2a2a2a' : 'linear-gradient(90deg, #00cfff, #00ff94)', color: generating ? '#6b7280' : '#0d0d0d' }}>
+          <RefreshCw size={15} />
+          {generating ? 'Generando...' : posts.length > 0 ? '🎲 Nuevas Ideas' : '✨ Generar Ideas'}
+        </button>
+      </div>
+
+      {/* Navegación semana */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '14px 16px', borderRadius: '14px', backgroundColor: '#161616', border: '1px solid #1f1f1f' }}>
+        <button onClick={prevWeek} style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '7px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', backgroundColor: 'transparent', border: '1px solid #2a2a2a', color: '#6b7280' }}>
+          <ChevronLeft size={14} />{isMobile ? '' : ' Anterior'}
+        </button>
+        <div style={{ flex: 1, textAlign: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', flexWrap: 'wrap' }}>
+            <Calendar size={14} style={{ color: '#00cfff' }} />
+            <span style={{ fontSize: isMobile ? '12px' : '14px', fontWeight: 700, color: '#f0f0f0' }}>{formatWeekDate(weekStart)}</span>
+            {isCurrentWeek && <span style={{ padding: '2px 8px', borderRadius: '999px', fontSize: '10px', fontWeight: 700, backgroundColor: '#00cfff0d', color: '#00cfff', border: '1px solid #00cfff22' }}>Esta semana</span>}
+          </div>
+          {posts.length > 0 && <p style={{ margin: '4px 0 0', fontSize: '11px', color: '#6b7280' }}>{publishedCount}/{posts.length} publicados</p>}
+        </div>
+        <button onClick={nextWeek} style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '7px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', backgroundColor: 'transparent', border: '1px solid #2a2a2a', color: '#6b7280' }}>
+          {isMobile ? '' : 'Siguiente '}<ChevronRight size={14} />
+        </button>
+      </div>
+
+      {/* Tabs de plataforma */}
+      {posts.length > 0 && (
+        <div style={{ display: 'flex', gap: '8px', padding: '4px', borderRadius: '12px', backgroundColor: '#161616', border: '1px solid #1f1f1f' }}>
+          {(['Instagram', 'TikTok', 'Pauta'] as const).map(tab => {
+            const pc = PLATFORM_CONFIG[tab]
+            const count = posts.filter(p => p.platform === tab).length
+            return (
+              <button key={tab} onClick={() => { setActiveTab(tab); setExpandedId(null) }}
+                style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '10px 8px', borderRadius: '9px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', border: 'none', transition: 'all 0.15s', backgroundColor: activeTab === tab ? pc.bg : 'transparent', color: activeTab === tab ? pc.color : '#6b7280', outline: activeTab === tab ? `1px solid ${pc.border}` : 'none' }}>
+                {pc.emoji} {tab} {count > 0 && <span style={{ padding: '1px 6px', borderRadius: '999px', fontSize: '10px', backgroundColor: activeTab === tab ? pc.color + '22' : '#2a2a2a', color: activeTab === tab ? pc.color : '#6b7280' }}>{count}</span>}
+              </button>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Estado vacío */}
+      {!loading && posts.length === 0 && (
+        <div style={{ borderRadius: '16px', padding: '48px 24px', textAlign: 'center', backgroundColor: '#161616', border: '1px dashed #2a2a2a' }}>
+          <Sparkles size={36} style={{ margin: '0 auto 16px', display: 'block', color: '#374151' }} />
+          <p style={{ margin: '0 0 8px', fontSize: '16px', fontWeight: 700, color: '#f0f0f0' }}>No hay contenido para esta semana</p>
+          <p style={{ margin: '0 0 20px', fontSize: '13px', color: '#6b7280' }}>Genera ideas de imágenes para Instagram, TikTok y pautas</p>
+          <button onClick={generateWeek} disabled={generating}
+            style={{ padding: '12px 28px', borderRadius: '12px', fontWeight: 700, fontSize: '14px', cursor: 'pointer', border: 'none', background: 'linear-gradient(90deg, #00cfff, #00ff94)', color: '#0d0d0d' }}>
+            ✨ Generar Ideas
+          </button>
+        </div>
+      )}
+
+      {/* Cards de contenido */}
+      {!loading && filteredPosts.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {filteredPosts.map(post => {
+            const pc = PLATFORM_CONFIG[post.platform]
+            const fc = FORMAT_CONFIG[post.format as keyof typeof FORMAT_CONFIG]
+            const isExpanded = expandedId === post.id
+            const isCopied = copiedId === post.id
+            return (
+              <div key={post.id} style={{ borderRadius: '16px', backgroundColor: '#161616', border: `1px solid ${isExpanded ? pc.color + '44' : '#1f1f1f'}`, overflow: 'hidden', opacity: post.status === 'publicado' && !isExpanded ? 0.6 : 1 }}>
+
+                {/* Card header */}
+                <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ padding: '3px 10px', borderRadius: '999px', fontSize: '11px', fontWeight: 700, backgroundColor: pc.bg, color: pc.color, border: `1px solid ${pc.border}` }}>
+                        {pc.emoji} {post.platform}
+                      </span>
+                      <span style={{ padding: '3px 10px', borderRadius: '999px', fontSize: '11px', fontWeight: 600, backgroundColor: '#0d0d0d', color: '#9ca3af', border: '1px solid #2a2a2a' }}>
+                        {fc?.emoji} {post.format} · {fc?.desc}
+                      </span>
+                    </div>
+                    <button onClick={() => toggleStatus(post)}
+                      style={{ width: '24px', height: '24px', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: post.status === 'publicado' ? '#00ff940d' : 'transparent', border: post.status === 'publicado' ? '1px solid #00ff9433' : '1px solid #2a2a2a' }}>
+                      {post.status === 'publicado' && <Check size={13} style={{ color: '#00ff94' }} />}
+                    </button>
+                  </div>
+
+                  <div>
+                    <p style={{ margin: '0 0 6px', fontSize: '15px', fontWeight: 800, color: '#f0f0f0', lineHeight: '1.3' }}>{post.topic}</p>
+                    <p style={{ margin: 0, fontSize: '12px', color: '#9ca3af', lineHeight: '1.5' }}>{post.caption_idea}</p>
+                  </div>
+
+                  <p style={{ margin: 0, fontSize: '11px', color: pc.color, opacity: 0.7 }}>{post.hashtags}</p>
+
+                  <button onClick={() => setExpandedId(isExpanded ? null : post.id)}
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '9px', borderRadius: '9px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', backgroundColor: isExpanded ? pc.bg : '#0d0d0d', border: `1px solid ${isExpanded ? pc.border : '#2a2a2a'}`, color: isExpanded ? pc.color : '#6b7280' }}>
+                    {isExpanded ? <><ChevronUp size={13} /> Cerrar detalle</> : <><ChevronDown size={13} /> Ver imagen + Prompt para ChatGPT</>}
+                  </button>
+                </div>
+
+                {/* Expandido */}
+                {isExpanded && (
+                  <div style={{ borderTop: `1px solid ${pc.border}`, padding: '16px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+
+                    {/* Qué plasmar en la imagen */}
+                    <div style={{ borderRadius: '12px', backgroundColor: '#0d0d0d', padding: '14px', border: '1px solid #2a2a2a' }}>
+                      <p style={{ margin: '0 0 8px', fontSize: '11px', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>🖼️ Qué plasmar en la imagen</p>
+                      <p style={{ margin: 0, fontSize: '13px', color: '#e5e7eb', lineHeight: '1.7' }}>{post.image_description}</p>
+                    </div>
+
+                    {/* Prompt para ChatGPT */}
+                    <div style={{ borderRadius: '12px', backgroundColor: '#0d0d0d', padding: '14px', border: `1px solid ${pc.border}` }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                        <p style={{ margin: 0, fontSize: '11px', fontWeight: 700, color: pc.color, textTransform: 'uppercase', letterSpacing: '0.05em' }}>✨ Prompt para ChatGPT</p>
+                        <button onClick={() => copyPrompt(post)}
+                          style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '5px 10px', borderRadius: '7px', fontSize: '11px', fontWeight: 700, cursor: 'pointer', backgroundColor: isCopied ? '#00ff940d' : pc.bg, border: `1px solid ${isCopied ? '#00ff9433' : pc.border}`, color: isCopied ? '#00ff94' : pc.color }}>
+                          {isCopied ? <><Check size={11} /> Copiado</> : <><Copy size={11} /> Copiar</>}
+                        </button>
+                      </div>
+                      <p style={{ margin: 0, fontSize: '12px', color: '#d1d5db', lineHeight: '1.8', fontFamily: 'monospace' }}>{post.prompt_chatgpt}</p>
+                    </div>
+
+                    {/* Caption */}
+                    <div style={{ borderRadius: '12px', backgroundColor: '#0d0d0d', padding: '14px', border: '1px solid #2a2a2a' }}>
+                      <p style={{ margin: '0 0 8px', fontSize: '11px', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>💬 Caption sugerido</p>
+                      <p style={{ margin: '0 0 8px', fontSize: '13px', color: '#e5e7eb', lineHeight: '1.6' }}>{post.caption_idea}</p>
+                      <p style={{ margin: 0, fontSize: '11px', color: pc.color, opacity: 0.8 }}>{post.hashtags}</p>
+                    </div>
+
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+    </div>
+  )
+}
