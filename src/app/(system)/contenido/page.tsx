@@ -1,465 +1,576 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabase'
+import { useState } from 'react'
 import { useIsMobile } from '@/lib/hooks'
-import { Sparkles, RefreshCw, Check, Calendar, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Copy, Megaphone, Target, DollarSign, Users, BarChart2 } from 'lucide-react'
+import { Copy, Check, ChevronDown, ChevronUp, Calendar, Layers, Image as ImageIcon, BookOpen } from 'lucide-react'
 
-interface ContentPost {
-  id: string
-  week_start: string
-  day_index: number
-  day_name: string
-  platform: 'Instagram' | 'TikTok'
-  format: 'Imagen Única' | 'Carrusel' | 'Historia'
-  topic: string
-  image_description: string
-  prompt_chatgpt: string
-  caption_idea: string
-  hashtags: string
-  status: 'pendiente' | 'publicado'
+interface Slide {
+  numero: number
+  rol: string
+  canvaPrompt: string
+  geminiPrompt: string
 }
 
-interface AdPost {
+interface Carousel {
   id: string
-  created_at: string
+  codigo: string
+  titulo: string
+  subtitulo: string
   objetivo: string
-  publico_objetivo: string
-  formato: string
-  headline: string
-  descripcion: string
-  cta: string
-  presupuesto_sugerido: string
-  prompt_chatgpt: string
-  metricas_esperadas: string
-  image_description: string
-  status: string
+  diaSemana: string[]
+  slides: Slide[]
+  caption: string
+  hashtags: string
 }
 
-const PLATFORM_CONFIG = {
-  Instagram: { color: '#e1306c', bg: '#e1306c0d', border: '#e1306c22', emoji: '📸' },
-  TikTok:    { color: '#00f2ea', bg: '#00f2ea0d', border: '#00f2ea22', emoji: '🎵' },
-}
+const CARRUSELES: Carousel[] = [
+  {
+    id: 'c1',
+    codigo: 'C1',
+    titulo: '¿Sigues repartiendo tarjetas de papel?',
+    subtitulo: 'Hook de problema · Venta directa',
+    objetivo: 'Crear conciencia del problema y posicionar Taply como solución inmediata',
+    diaSemana: ['Lunes (12PM)', 'Jueves (7PM)'],
+    slides: [
+      {
+        numero: 1,
+        rol: 'PORTADA — Hook',
+        canvaPrompt: 'Diseño 1080×1080px. Fondo negro puro (#000000). Texto principal centrado en blanco bold (Montserrat ExtraBold): "¿Sigues repartiendo tarjetas de papel en 2026?" — letra grande, ocupa 70% del ancho. Debajo en gris claro (#9CA3AF): "Hay una forma más inteligente de presentarte." Línea degradada horizontal al fondo inferior: de cian (#00C2FF) a verde menta (#00FFAA), 4px de grosor. Esquina superior izquierda: logo Taply (adjunto), tamaño aprox 80px de ancho.',
+        geminiPrompt: 'Crea el texto para la portada de un carrusel de Instagram. El negocio es Taply NFC Colombia — vendemos tarjetas de presentación digitales NFC hechas a mano, desde $100.000 COP, pago único. El hook debe generar curiosidad e identificar el dolor del emprendedor colombiano que todavía usa tarjetas de papel. Máximo 12 palabras para el título. Tono directo, moderno, sin clichés. Solo devuelve el título y el subtítulo, sin explicaciones.'
+      },
+      {
+        numero: 2,
+        rol: 'PROBLEMA — El dolor real',
+        canvaPrompt: 'Diseño 1080×1080px. Fondo negro (#000000). Ícono de papelera o tarjeta rota en rojo suave (#F87171). Texto bold blanco: "Las tarjetas de papel se pierden, se dañan y quedan desactualizadas." Subtexto en gris: "Cada vez que cambias tu número o redes, son dinero botado." Franja degradada cian-verde al pie (#00C2FF → #00FFAA, 4px). Logo Taply esquina superior izquierda.',
+        geminiPrompt: 'Escribe el texto para la diapositiva 2 de un carrusel de Instagram de Taply NFC Colombia. Esta slide muestra el PROBLEMA: las tarjetas de papel físicas son ineficientes, se pierden, se desactualizan y cuestan dinero recurrente. El público es emprendedor colombiano. Usa lenguaje coloquial colombiano. Máximo 2 frases cortas. Solo el texto, sin explicaciones.'
+      },
+      {
+        numero: 3,
+        rol: 'SOLUCIÓN — Presentar Taply',
+        canvaPrompt: 'Diseño 1080×1080px. Fondo negro (#000000). Centro: imagen o ícono de tarjeta NFC negra con efecto de brillo/glow cian radiante. Texto bold blanco: "Taply NFC — tu tarjeta digital hecha a mano." Subtexto: "Un toque. Tu perfil completo. Siempre actualizado." Palabras "Un toque" en degradado cian-verde (#00C2FF → #00FFAA). Franja degradada al pie. Logo Taply esquina superior izquierda.',
+        geminiPrompt: 'Escribe el texto para la slide 3 de un carrusel de Taply NFC Colombia. Esta slide presenta LA SOLUCIÓN: la tarjeta NFC digital hecha a mano. Debe hacer sentir al lector que descubrió algo que no sabía que necesitaba. Destacar: un toque basta, funciona con cualquier celular, sin apps. Máximo 2 frases. Solo el texto, sin explicaciones.'
+      },
+      {
+        numero: 4,
+        rol: 'BENEFICIOS — Qué comparte',
+        canvaPrompt: 'Diseño 1080×1080px. Fondo negro (#000000). Título bold blanco: "Con Taply compartes todo:" Lista vertical con iconos en cian: 📞 Teléfono y WhatsApp / 🌐 Web y redes sociales / 📍 Ubicación / 🎥 Videos y portafolio / ⭐ Reseñas de Google. Franja degradada al pie. Logo Taply esquina superior izquierda.',
+        geminiPrompt: 'Escribe el texto para la slide 4 de un carrusel de Taply NFC Colombia. Lista breve y poderosa de 5 ítems de lo que puede compartir el usuario. Cada ítem máximo 4 palabras. Empieza cada línea con un emoji relevante. Solo la lista, sin título ni explicaciones.'
+      },
+      {
+        numero: 5,
+        rol: 'PRECIO + CTA — Cierre de venta',
+        canvaPrompt: 'Diseño 1080×1080px. Fondo negro (#000000). Texto centrado bold blanco muy grande: "Desde $100.000 COP — Pago único." Subtexto: "Sin mensualidades. Sin papel. Para siempre actualizado." Texto accent en degradado cian-verde bold: "Escríbenos hoy 👇" Franja degradada al pie muy vibrante. Logo Taply esquina superior izquierda.',
+        geminiPrompt: 'Escribe el texto de cierre para la última slide de un carrusel de ventas de Taply NFC Colombia. Debe incluir el precio ($100.000 COP pago único), una propuesta de valor irresistible y un llamado a la acción claro para que el cliente escriba por DM o WhatsApp. Tono urgente pero no agresivo. Máximo 3 líneas. Solo el texto, sin explicaciones.'
+      }
+    ],
+    caption: `¿Cuánto llevas gastando en tarjetas de papel que nadie guarda? 😅
 
-const FORMAT_CONFIG = {
-  'Imagen Única': { emoji: '🖼️', desc: '1080x1080px' },
-  'Carrusel':     { emoji: '🎠', desc: '5-8 slides' },
-  'Historia':     { emoji: '📱', desc: '1080x1920px' },
-}
+Con Taply NFC, un solo toque comparte todo tu perfil profesional — redes, WhatsApp, ubicación, portafolio y más. Sin que la otra persona instale nada.
 
-// Cadencia fija por día — 7 días por plataforma
-const CADENCE_IG: ('Imagen Única' | 'Carrusel' | 'Historia')[] = [
-  'Imagen Única', 'Carrusel', 'Historia', 'Imagen Única', 'Carrusel', 'Historia', 'Imagen Única'
-]
-const CADENCE_TK: ('Imagen Única' | 'Carrusel' | 'Historia')[] = [
-  'Historia', 'Imagen Única', 'Carrusel', 'Historia', 'Imagen Única', 'Carrusel', 'Historia'
-]
+✅ Siempre actualizado
+✅ Funciona con iPhone y Android
+✅ Pago único desde $100.000 COP
 
-const CONTENT_BANK_IG = [
-  { format: 'Imagen Única', topic: 'El tap que lo cambia todo', image_description: 'Fondo negro matte. Mano sosteniendo tarjeta Taply negra. Onda cyan emanando del centro. Texto: "Un tap. Tu mundo completo."', prompt_chatgpt: 'Flat lay product photo on matte black surface. Sleek black NFC business card centered, cyan neon glow radiating outward in concentric circles. Dramatic studio lighting from above, ultra sharp, 4K, commercial product photography. Color palette: black, cyan #00CFFF, white. 1080x1080px.', caption_idea: '¿Todavía regalas tarjetas que nadie guarda? Un solo tap y tu contacto queda guardado para siempre. 🖤', hashtags: '#TaplyNFC #TarjetasNFC #NetworkingColombia #TechColombia' },
-  { format: 'Imagen Única', topic: 'Info siempre actualizada', image_description: 'Dos tarjetas en comparación. Izquierda: papel arrugado con número tachado. Derecha: Taply negra con ícono de edición cyan. Texto: "Tu info cambia. Tu Taply también."', prompt_chatgpt: 'Split composition product photo, matte black surface. Left: crumpled white paper business card crossed out number, dim warm light. Right: sleek black NFC card with cyan glow and edit icon, bright clean light. Dramatic contrast, commercial photography style, 4K, 1080x1080px.', caption_idea: '¿Cambiaste de número, empresa o redes? Avísanos y actualizamos tu Taply sin costo. ✅', hashtags: '#TaplyNFC #Servicio #NFC #TechFacil #Colombia' },
-  { format: 'Imagen Única', topic: 'Taply para agentes inmobiliarios', image_description: 'Profesional en traje sosteniendo Taply negra frente a propiedad difuminada. Texto: "Comparte tu portafolio con un tap." Efecto cyan en la tarjeta.', prompt_chatgpt: 'Professional real estate agent holding black NFC card, luxury property blurred background, dramatic lighting, matte black card with cyan tap glow effect. Bold white text overlay space at bottom. Commercial photography style, 4K, 1080x1080px.', caption_idea: 'Portafolio, WhatsApp y redes sociales en un solo tap. Así trabajan los agentes del futuro. 🏠', hashtags: '#TaplyNFC #Inmobiliaria #NFC #BienesRaices #Colombia' },
-  { format: 'Imagen Única', topic: 'Networking en eventos', image_description: 'Mano extendiendo Taply negra en evento oscuro con luces de fondo. Onda cyan. Texto: "El primer paso de cada gran conexión."', prompt_chatgpt: 'Close up hand presenting sleek black NFC card at networking event, bokeh background warm event lights, dramatic foreground lighting, cyan ripple effect on card. White text overlay space. Ultra sharp focus on card, 4K, 1080x1080px.', caption_idea: 'En cada evento hay una oportunidad esperando un tap. ¿Tienes la tuya? 🤝', hashtags: '#TaplyNFC #Networking #Eventos #Colombia #Emprendimiento' },
-  { format: 'Imagen Única', topic: 'Taply para médicos', image_description: 'Médico en bata blanca sosteniendo Taply negra. Fondo clínico difuminado. Texto: "Consulta, WhatsApp y agenda con un tap."', prompt_chatgpt: 'Doctor in white coat holding sleek black NFC card, clinic background blurred, dramatic lighting, matte black card subtle cyan glow. Professional medical aesthetic, high contrast. Bold text space at bottom. Commercial photography, 4K, 1080x1080px.', caption_idea: 'Tus pacientes siempre tendrán tu contacto actualizado. Sin buscar papeles. 🩺', hashtags: '#TaplyNFC #Salud #Medicos #NFC #Colombia' },
-  { format: 'Imagen Única', topic: 'La tarjeta que nunca se acaba', image_description: 'Pila de tarjetas papel desgastadas vs una sola Taply brillante. Texto: "Infinita vs temporal."', prompt_chatgpt: 'Product comparison shot on matte black surface. Left: tall stack of worn paper business cards, slightly yellowed, chaotic. Right: single pristine black NFC card with elegant cyan glow. Dramatic side lighting, deep shadows. Minimalist composition, 4K, 1080x1080px.', caption_idea: 'Cuántas veces has tenido que reimprimirlas. Con Taply, una sola y para siempre. ♾️', hashtags: '#TaplyNFC #Sostenibilidad #NFC #InversionInteligente #Colombia' },
-  { format: 'Imagen Única', topic: 'Taply para restaurantes', image_description: 'Mesa de restaurante elegante. Taply negra sobre mantel oscuro. Ícono de menú digital en cyan. Texto: "Menú digital con un tap."', prompt_chatgpt: 'Elegant restaurant table setting, matte black NFC card on dark linen tablecloth, floating digital menu icon in cyan above card. Warm moody restaurant lighting, dramatic shadows. Product photography style, 4K, 1080x1080px.', caption_idea: 'Menú, reservas e Instagram de tu restaurante en un solo tap. 🍽️', hashtags: '#TaplyNFC #Restaurantes #Gastronomia #NFC #Colombia' },
-  { format: 'Imagen Única', topic: 'Precio vs valor', image_description: 'Calculadora con billetes (tarjetas papel x años) vs una Taply sola. Texto: "La inversión inteligente."', prompt_chatgpt: 'Minimalist concept image on matte black surface. Left side: scattered Colombian peso bills and stack of paper cards, calculator large number, warm dim light. Right side: single sleek black NFC card with cyan glow, clean bright light. Bold text space center. 4K, 1080x1080px.', caption_idea: '200 tarjetas x 3 veces al año = mucho dinero. Una Taply = inversión única para siempre. 💡', hashtags: '#TaplyNFC #InversionInteligente #Emprendimiento #Colombia #NFC' },
-  { format: 'Imagen Única', topic: 'Taply para abogados', image_description: 'Escritorio de abogado con togas al fondo. Taply negra sobre documentos. Texto: "Tu firma legal en un tap."', prompt_chatgpt: 'Lawyer desk setting, sleek black NFC card on legal documents, law books blurred background, dramatic moody lighting, cyan glow on card. Professional legal aesthetic, dark wood tones. Commercial photography, 4K, 1080x1080px.', caption_idea: 'Tus datos, tu firma y tu consulta disponibles en un tap. Profesionalismo del siglo XXI. ⚖️', hashtags: '#TaplyNFC #Abogados #Legal #NFC #Colombia' },
-  { format: 'Imagen Única', topic: 'El momento del tap', image_description: 'Macro shot de iPhone acercándose a Taply. Chispa cyan en el punto de contacto. Texto: "El momento que lo cambia todo."', prompt_chatgpt: 'Extreme close up macro shot of iPhone approaching matte black NFC card, exact moment of tap, electric cyan spark at contact point, completely dark background, dramatic single light source. Ultra sharp on contact point, motion blur on phone, 4K, 1080x1080px.', caption_idea: 'En 0.3 segundos tu contacto completo guardado para siempre. ⚡', hashtags: '#TaplyNFC #NFC #Tech #Colombia #Networking' },
-  { format: 'Carrusel', topic: '5 razones para dejar las tarjetas de papel', image_description: 'Slide 1: Hook negro "¿Aún usas tarjetas de papel?" cyan. Slides 2-6: cada razón con ícono cyan. Slide final: CTA con logo.', prompt_chatgpt: 'Series of 6 minimalist carousel slides, 1080x1080px. Consistent matte black background, white bold typography, cyan #00CFFF accents. Slide 1: large provocative headline. Slides 2-6: single centered icon with one line of text. Final slide: centered logo and CTA. Clean modern tech aesthetic.', caption_idea: 'La tarjeta de papel tiene fecha de vencimiento. La Taply no. Desliza y te cuento por qué. 👉', hashtags: '#TaplyNFC #Networking #TarjetasInteligentes #Colombia #Emprendedor' },
-  { format: 'Carrusel', topic: 'Taply para diferentes profesiones', image_description: 'Slide 1: "¿Cuál es tu profesión?" Slides: médico, abogado, chef, agente, diseñador con ícono cyan. Slide final: "Un solo tap."', prompt_chatgpt: 'Professional carousel series, 1080x1080px per slide. Matte black background. Each slide: one large minimalist profession icon in cyan, profession name bold white, one sentence use case. Geometric sans-serif typography. Final slide: Taply logo centered. Commercial tech brand.', caption_idea: 'No importa a qué te dediques — Taply se adapta a tu mundo. ¿Cuál eres tú? 👇', hashtags: '#TaplyNFC #Profesionales #NFC #Networking #Colombia' },
-  { format: 'Carrusel', topic: 'Top 5 errores al hacer networking', image_description: 'Slide 1: "Los errores que te cuestan clientes". Slides: error X rojo + solución cyan. Slide final: Taply como solución.', prompt_chatgpt: 'Educational carousel, 1080x1080px per slide. Matte black background. Slide 1: bold red/white hook text. Error slides: red X icon, mistake white, cyan checkmark with Taply solution. Final: all checkmarks cyan, Taply logo. High contrast, impactful typography.', caption_idea: 'Si has cometido alguno de estos errores, Taply es tu solución. ¿Cuántos reconoces? 🤔', hashtags: '#TaplyNFC #Networking #Errores #Emprendimiento #Colombia' },
-  { format: 'Carrusel', topic: '¿Qué información comparte tu Taply?', image_description: 'Slide 1: "Todo tu mundo en un tap". Slides: WhatsApp, Instagram, web, portafolio, ubicación con ícono. Slide final: "Y lo que quieras."', prompt_chatgpt: 'Information showcase carousel, 1080x1080px per slide. Matte black background. Each slide: one large social/contact icon in cyan, service name white, brief description gray. Consistent grid layout, modern tech aesthetic. Final slide: constellation of all icons.', caption_idea: 'Un tap y comparten todo lo que necesitan saber de ti. Sin teclear nada. 🔗', hashtags: '#TaplyNFC #PerfilDigital #NFC #Colombia #Tech' },
-  { format: 'Carrusel', topic: 'Antes y después de tener Taply', image_description: 'Slides alternando ANTES (gris/rojo) vs DESPUÉS (cyan/blanco). Slide final: estadística de impacto.', prompt_chatgpt: 'Before/after narrative carousel, 1080x1080px. Alternating slides: BEFORE desaturated dim light. AFTER clean cyan accents bright. Split screens same scenario transformed. Final stats slide: bold numbers cyan on black. Storytelling progression, high impact.', caption_idea: 'El antes y después que nadie te cuenta sobre el networking profesional. 📊', hashtags: '#TaplyNFC #AntesYDespues #Networking #Colombia #Emprendimiento' },
-  { format: 'Carrusel', topic: 'Cómo funciona Taply en 4 pasos', image_description: 'Slide 1: "Así de fácil es Taply" con número 4. Slides 2-5: paso numerado con ícono. Slide final: resultado con CTA.', prompt_chatgpt: 'Step-by-step tutorial carousel, 1080x1080px. Matte black. Each step: large step number in cyan circle, simple icon, bold white action text, gray description. Progressive arrow between slides. Clean instructional design. Final result slide with CTA.', caption_idea: 'En menos de 5 minutos tienes tu Taply lista para usar. Así de simple. ⚡', hashtags: '#TaplyNFC #Tutorial #NFC #Colombia #TechFacil' },
-  { format: 'Carrusel', topic: 'Taply para el sector salud', image_description: 'Slide 1: "¿Eres del sector salud?" Slides: médico, dentista, psicólogo, nutricionista con caso de uso. Slide final: CTA.', prompt_chatgpt: 'Healthcare professional carousel, 1080x1080px. Matte black background. Each slide: large medical profession icon in cyan, profession bold white, specific Taply use case gray text. Clinical clean aesthetic, professional tone. Final CTA slide with Taply logo.', caption_idea: 'El sector salud que comparte su info con un tap. Tus pacientes te lo agradecerán. 🏥', hashtags: '#TaplyNFC #Salud #NFC #Colombia #Profesionales' },
-  { format: 'Historia', topic: 'Encuesta: ¿tarjeta física o digital?', image_description: 'Fondo negro. Ícono papel tachado rojo vs NFC cyan. Texto: "¿Cuál usas tú?" Espacio para encuesta Instagram.', prompt_chatgpt: 'Minimalist Instagram Story, 1080x1920px. Matte black background. Top third: two icons side by side — paper card red X, NFC card cyan glow. Center: bold white question text. Bottom third: two rounded poll option buttons dark gray white text. Space for Instagram poll sticker.', caption_idea: 'Vota y cuéntanos 👇 Los que respondieron NFC ya tienen su Taply.', hashtags: '#TaplyNFC #Encuesta #NFC #Colombia' },
-  { format: 'Historia', topic: 'Precio vs valor de Taply', image_description: 'Fondo negro. Arriba: costo anual papel en rojo. Línea cyan centro. Abajo: Taply "una sola vez" cyan. Texto: "¿Cuál es la inversión inteligente?"', prompt_chatgpt: 'Minimalist infographic Story, 1080x1920px. Matte black. Top half: red toned section, stack paper cards, money symbols, yearly cost white text. Cyan horizontal divider. Bottom half: single NFC card cyan glow, one-time investment white text. Bold typography, high contrast.', caption_idea: 'Haz las matemáticas. La Taply se paga sola en el primer mes. 💡', hashtags: '#TaplyNFC #InversionInteligente #Emprendimiento #Colombia' },
-  { format: 'Historia', topic: 'Mito: necesitas internet para el NFC', image_description: 'Fondo negro. "❌ MITO" rojo grande. "Tu Taply NO necesita internet" blanco. Sub-texto cyan. Ícono NFC abajo.', prompt_chatgpt: 'Myth-busting Story, 1080x1920px. Matte black. Top: large red MITO text with X. Center: bold white clarification two lines. Below: cyan NFC wave icon. Bottom: supporting detail light gray. Clean typographic hierarchy, cyan glow elements.', caption_idea: 'La pregunta que todos hacen 👆 Comparte para que lo sepa tu red.', hashtags: '#TaplyNFC #MitoVsRealidad #NFC #TechTips #Colombia' },
-  { format: 'Historia', topic: 'CTA urgente — pide la tuya hoy', image_description: 'Fondo negro. Logo pequeño arriba. Centro: "¿Sigues perdiendo contactos valiosos?" 3 beneficios cyan. Fondo cyan abajo: "Pide la tuya hoy →" negro.', prompt_chatgpt: 'Conversion Story, 1080x1920px. Three zones: top 20% black small logo. Middle 50%: large bold white question, three benefit lines cyan checkmarks. Bottom 30%: solid cyan rectangle, bold black CTA text arrow. Sharp edge black/cyan. Direct conversion-focused design.', caption_idea: 'Cada evento es una oportunidad. No la dejes pasar sin tu Taply.', hashtags: '#TaplyNFC #NFC #Colombia' },
-  { format: 'Historia', topic: 'Cliente feliz del mes', image_description: 'Fondo negro degradado cyan suave. Marco elegante para foto cliente. Texto: "Así usa Taply [nombre]" con testimonio. Logo pequeño abajo.', prompt_chatgpt: 'Customer testimonial Story template, 1080x1920px. Matte black background very subtle cyan gradient edges. Elegant rounded frame for customer photo center large. Below: customer name in cyan, profession white, short quote light gray italic. Bottom: small Taply logo. Clean premium aesthetic.', caption_idea: '¿Quieres ser el próximo cliente destacado? Etiquétanos con tu Taply. 🌟', hashtags: '#TaplyNFC #ClienteDelMes #Testimonial #Colombia' },
-  { format: 'Historia', topic: 'Tip: cómo sacar el máximo a tu Taply', image_description: 'Fondo negro. Número "3" grande en cyan. Tres tips en bloques blancos cortos. CTA final: "¿Dudas? Escríbenos." Logo abajo.', prompt_chatgpt: 'Tips Story design, 1080x1920px. Matte black background. Top: large bold number 3 in cyan circle. Three tip blocks below: cyan number badge, white tip title, gray brief explanation. Bottom: CTA text white, small logo. Clean educational aesthetic, high readability.', caption_idea: '3 tips para sacarle el máximo provecho a tu Taply desde el día uno. 💡', hashtags: '#TaplyNFC #Tips #NFC #Colombia #TechTips' },
-]
+👇 Escríbenos por DM o al link de bio y te cotizamos hoy mismo.`,
+    hashtags: '#TarjetaNFC #NFC #TarjetaDigital #EmprendedoresColombia #NetworkingDigital #Taply #MarketingDigital #Colombia #Bogotá #EmprendimientoCO #TaplyNFC'
+  },
+  {
+    id: 'c2',
+    codigo: 'C2',
+    titulo: 'Tu negocio merece una primera impresión que no se borre',
+    subtitulo: 'Identidad de negocio · Profesionalismo',
+    objetivo: 'Conectar con dueños de negocio físico que quieren proyectar imagen profesional',
+    diaSemana: ['Lunes (7PM)', 'Viernes (12PM)'],
+    slides: [
+      {
+        numero: 1,
+        rol: 'PORTADA — Hook negocio',
+        canvaPrompt: 'Diseño 1080×1080px. Fondo negro (#000000). Texto principal bold blanco centrado: "Tu negocio merece una primera impresión que no se borre." Subtexto gris: "La tarjeta de presentación del futuro ya existe." Franja degradada cian-verde al pie. Logo Taply esquina superior izquierda.',
+        geminiPrompt: 'Crea el texto de portada para un carrusel Instagram de Taply NFC Colombia dirigido a dueños de negocio físico (tiendas, salones, restaurantes, consultorios) en Colombia. Máximo 10 palabras para el título. Subtítulo de 1 frase. Tono aspiracional y directo. Solo texto, sin explicaciones.'
+      },
+      {
+        numero: 2,
+        rol: 'ESCENARIO — El cliente que se va',
+        canvaPrompt: 'Diseño 1080×1080px. Fondo negro (#000000). Texto bold blanco: "Imagina esto:" seguido en blanco regular: "Alguien entra a tu negocio. Le das tu tarjeta. Llega a casa y la tira a la basura." Debajo en rojo suave (#F87171): "Eso no pasa con Taply." Franja cian-verde al pie. Logo Taply esquina superior izquierda.',
+        geminiPrompt: 'Escribe el texto para la slide 2 de un carrusel de Taply NFC Colombia. Cuenta un micro-escenario cotidiano: alguien entra al negocio, intercambian tarjeta, y esa tarjeta termina perdida. 3 frases cortas estilo guión. Termina con "Eso no pasa con Taply." Solo el texto.'
+      },
+      {
+        numero: 3,
+        rol: 'PROCESO — Cómo funciona',
+        canvaPrompt: 'Diseño 1080×1080px. Fondo negro (#000000). Tres pasos en columna: 1️⃣ "Acercas tu Taply al celular del cliente" | 2️⃣ "Abre automáticamente tu perfil digital" | 3️⃣ "Guarda tus datos con un toque" — número en cian bold, texto en blanco. Franja cian-verde al pie. Logo Taply esquina superior izquierda.',
+        geminiPrompt: 'Escribe los 3 pasos de cómo funciona Taply NFC para la slide 3. Cada paso máximo 7 palabras. Sin tecnicismos. Usa emojis de números (1️⃣2️⃣3️⃣). Solo los 3 pasos, sin título ni explicaciones.'
+      },
+      {
+        numero: 4,
+        rol: 'CASOS DE USO — Para qué negocio',
+        canvaPrompt: 'Diseño 1080×1080px. Fondo negro (#000000). Título blanco bold: "Perfecta para cualquier negocio:" Grid 2x3: 🍽️ Restaurantes · 💇 Salones de belleza · 🏋️ Gimnasios · 🏠 Inmobiliarias · 📸 Fotógrafos · 💼 Consultores. Iconos en cian, texto blanco. Franja cian-verde al pie. Logo Taply esquina superior izquierda.',
+        geminiPrompt: 'Lista 6 tipos de negocio colombiano que más se benefician de una tarjeta NFC. Cada uno con emoji relevante y máximo 2 palabras. Formato de lista simple. Solo el título corto y la lista.'
+      },
+      {
+        numero: 5,
+        rol: 'CTA — Invitación directa',
+        canvaPrompt: 'Diseño 1080×1080px. Fondo negro (#000000). Texto bold blanco grande: "Dale a tu negocio la imagen que merece." Subtexto: "Tarjeta Taply NFC — Desde $100.000 COP · Pago único" Texto accent en degradado cian-verde bold: "¿Tu negocio ya tiene Taply? 👇" Franja degradada al pie vibrante. Logo Taply esquina superior izquierda.',
+        geminiPrompt: 'Escribe el cierre con llamado a la acción para la última slide, dirigido a dueños de negocio. Menciona el precio ($100.000 COP pago único), invita al DM. Máximo 3 líneas. Solo el texto.'
+      }
+    ],
+    caption: `Tu negocio tiene 3 segundos para causar la primera impresión. ⚡
 
-const CONTENT_BANK_TK = [
-  { format: 'Imagen Única', topic: 'El tap más rápido del oeste', image_description: 'Fondo negro. Mano con iPhone acercándose a Taply. Motion blur. Chispa cyan. Texto: "0.3 segundos. Tu contacto guardado."', prompt_chatgpt: 'Dynamic action shot, 1080x1080px, TikTok aesthetic. Matte black background. Close up hand holding iPhone approaching black NFC card. Motion blur on hand, cyan electric spark at contact point. Bold oversized white text at top. High energy raw feel, slight film grain. High contrast, 4K.', caption_idea: 'Más rápido que buscar tu tarjeta en la billetera. ⚡ #TaplyNFC', hashtags: '#TaplyNFC #NFC #Tech #Networking #Colombia #Viral' },
-  { format: 'Imagen Única', topic: 'Duelo: papel vs NFC', image_description: 'Split screen. Izquierda: cronómetro 45seg caótico. Derecha: cronómetro 0.3seg con tap cyan. "VS" grande al centro.', prompt_chatgpt: 'Split screen comparison, 1080x1080px TikTok style. Matte black. Left warm dim: stopwatch 45 seconds, person frantically searching wallet. Right cool cyan: stopwatch 0.3 seconds, NFC card electric tap. Bold VS text centered white. Dramatic lighting contrast, 4K.', caption_idea: 'Comenta "papel" vs "NFC" 👇 Veamos quién gana.', hashtags: '#TaplyNFC #Duelo #NFC #Colombia #Networking #TikTok' },
-  { format: 'Imagen Única', topic: 'POV: único con NFC en el evento', image_description: 'Fondo negro. Texto TikTok: "POV: Sacas tu Taply en el evento". Tarjeta flotante con íconos de interrogación en cyan.', prompt_chatgpt: 'TikTok native text-style image, 1080x1080px. Matte black. Large white POV: text top. Scenario text smaller white. Center: sleek black NFC card floating cyan glow, small white question mark icons floating around. Bottom: reaction emoji. Authentic TikTok aesthetic, bold typography.', caption_idea: 'Y ahí empieza la conversación 😏 ¿Ya tienes la tuya? #TaplyNFC', hashtags: '#POV #TaplyNFC #NFC #Networking #TikTokColombia #Viral' },
-  { format: 'Imagen Única', topic: 'Reacción al ver Taply por primera vez', image_description: 'Emojis de sorpresa alrededor de Taply con glow cyan. Texto: "La cara de todos cuando ven tu Taply 😱"', prompt_chatgpt: 'Reaction meme style image, 1080x1080px TikTok aesthetic. Matte black background. Center: sleek black NFC card dramatic cyan glow halo. Surrounding: large surprise emojis in circle. Bold white text top and bottom. Fun energetic composition, TikTok viral style.', caption_idea: 'Sin excepción. Todos reaccionan igual 😂 #TaplyNFC', hashtags: '#TaplyNFC #Reaccion #NFC #TikTokColombia #Viral #Colombia' },
-  { format: 'Imagen Única', topic: 'El networking del futuro ya llegó', image_description: 'Fondo negro con grid cyan sutil. Mano con Taply emanando conexiones digitales. Texto: "2026. Así se hace networking."', prompt_chatgpt: 'Futuristic tech aesthetic, 1080x1080px TikTok style. Deep black background subtle cyan grid lines. Center: hand holding black NFC card with glowing cyan digital connection lines radiating outward like network map. Bold white text overlay. Sci-fi inspired, clean, 4K.', caption_idea: 'El futuro del networking ya está aquí. ¿Te estás quedando atrás? 🚀', hashtags: '#TaplyNFC #Futuro #Networking #NFC #TikTok #Colombia' },
-  { format: 'Imagen Única', topic: 'Cuando no tienes tarjetas en el evento', image_description: 'Meme de pánico/estrés a la izquierda vs cara tranquila con Taply a la derecha. Texto: "Tener Taply vs no tenerla."', prompt_chatgpt: 'Meme comparison image, 1080x1080px TikTok style. Matte black background. Left half: stressed person icon/emoji, chaotic red energy, no card. Right half: calm person icon, cyan glow, holding NFC card elegantly. Bold white labels top each side. Center thin cyan divider. Relatable humor aesthetic.', caption_idea: 'La diferencia es enorme. ¿De cuál lado estás tú? 😅 #TaplyNFC', hashtags: '#TaplyNFC #Meme #NFC #TikTok #Colombia #Networking' },
-  { format: 'Imagen Única', topic: 'Taply en 3 palabras', image_description: 'Fondo negro. Tres palabras grandes en tipografía bold: "TOCA." "COMPARTE." "IMPRESIONA." Cada palabra con acento cyan diferente. Taply logo abajo.', prompt_chatgpt: 'Typographic brand image, 1080x1080px TikTok aesthetic. Pure matte black background. Three words stacked vertically, massive bold white sans-serif: TOCA - COMPARTE - IMPRESIONA. Each word has subtle cyan underline or accent. Bottom: small Taply logo in cyan gradient. Minimal, powerful, brand statement. High contrast.', caption_idea: 'Tres palabras que definen todo. ¿Cuál es la tuya favorita? 👇', hashtags: '#TaplyNFC #NFC #Branding #TikTok #Colombia' },
-  { format: 'Imagen Única', topic: 'El tap más elegante de Colombia', image_description: 'Plano cenital de mano con reloj elegante sosteniendo Taply negra sobre superficie de mármol oscuro. Efecto de luz cyan puntual. Ultra premium.', prompt_chatgpt: 'Top-down luxury product shot, 1080x1080px TikTok premium aesthetic. Dark marble surface, elegant hand with luxury watch holding matte black NFC card. Single precise cyan light beam hitting card center. Deep shadows, ultra sharp, commercial luxury photography. No text, pure visual impact. 4K.', caption_idea: 'Algunos detalles dicen todo sin decir nada. 🖤 #TaplyNFC', hashtags: '#TaplyNFC #Lujo #NFC #Premium #Colombia #TikTok' },
-  { format: 'Imagen Única', topic: 'Por qué el NFC no es magia', image_description: 'Fondo negro. Diagrama simple: teléfono → onda NFC → tarjeta. Flechas cyan. Texto: "No es magia. Es tecnología." Estética educativa TikTok.', prompt_chatgpt: 'Educational explainer image, 1080x1080px TikTok style. Matte black background. Simple diagram: smartphone icon, cyan wave arrows, NFC card icon in sequence. Bold white title top. Brief gray explanation text below diagram. Clean educational design, minimal icons, high readability. Tech infographic aesthetic.', caption_idea: 'No es magia — es NFC. Y ahora lo tienes en una tarjeta hecha a mano. 🔬', hashtags: '#TaplyNFC #NFC #TechExplained #TikTok #Colombia' },
-  { format: 'Imagen Única', topic: 'Taply para freelancers', image_description: 'Espacio de trabajo creativo con laptop y café. Taply negra al lado. Texto: "Tu portafolio completo en un tap." Efecto cyan en la tarjeta.', prompt_chatgpt: 'Creative freelancer workspace flat lay, 1080x1080px TikTok aesthetic. Dark wood desk surface, laptop, coffee cup, notebook, and sleek black NFC card with cyan glow as hero element. Overhead shot, moody creative lighting. Bold white text overlay. Authentic creative professional feel, 4K.', caption_idea: 'Tu portafolio, redes y contacto en un tap. Para los creativos que no paran. 🎨', hashtags: '#TaplyNFC #Freelancer #Creativos #NFC #Colombia #TikTok' },
-  { format: 'Carrusel', topic: '5 personas que NECESITAN Taply', image_description: 'Slide 1: "Si haces esto, necesitas Taply 🧵". Slides 2-6: profesión con ícono cyan directo. Slide final: "¿Eres tú? 👇"', prompt_chatgpt: 'TikTok carousel series, 1080x1080px. Consistent matte black. Slide 1: large hook text bold white. Each slide: oversized cyan emoji/icon centered, bold white profession, one-line gray description. Raw TikTok energy, bold sans-serif. Final slide: white CTA text arrow down.', caption_idea: '¿Cuál eres tú? 1, 2, 3, 4 o 5 en comentarios 👇', hashtags: '#TaplyNFC #NFC #Profesionales #TikTokColombia' },
-  { format: 'Carrusel', topic: 'Antes y después del networking', image_description: 'Slide 1: "ANTES de Taply" billetera caótica. Slide 2: "DESPUÉS" mano limpia Taply cyan. Slide 3: estadísticas. Slide 4: CTA.', prompt_chatgpt: 'Before/after TikTok carousel, 1080x1080px. Slide 1: desaturated cluttered wallet overflowing cards, dim chaotic. Slide 2: clean black surface, single NFC card cyan glow, dramatic spotlight. Slide 3: minimalist stats black and cyan. Slide 4: bold CTA black. Consistent frame border.', caption_idea: 'El networking en 2026 ya no se hace con papeles. Te lo demuestro 👇', hashtags: '#TaplyNFC #AntesYDespues #Networking #TikTokColombia #Tech' },
-  { format: 'Carrusel', topic: 'Mini guía: cómo usar tu Taply', image_description: 'Slide 1: "Guía rápida Taply ⚡". Slides 2-5: paso a paso con íconos. Slide final: "¿Dudas? DM."', prompt_chatgpt: 'Quick guide TikTok carousel, 1080x1080px. Matte black. Slide 1: bold hook text cyan accent. Each step: large cyan circle number, action icon, bold instruction white, brief gray explanation. Arrow right each slide. Final: DM invitation with handle. TikTok educational style.', caption_idea: 'Guárdalo para cuando llegue tu Taply 📌 #TaplyNFC', hashtags: '#TaplyNFC #Tutorial #NFC #TikTokColombia #GuiaRapida' },
-  { format: 'Carrusel', topic: '3 razones por las que tu competencia ya usa NFC', image_description: 'Slide 1: "Tu competencia ya lo sabe 👀". Slides 2-4: razón con ícono impacto. Slide 5: "¿Y tú?" con CTA.', prompt_chatgpt: 'Competitive awareness TikTok carousel, 1080x1080px. Matte black. Slide 1: provocative hook bold white, eye emoji cyan. Each reason slide: large impact icon cyan, bold white reason title, gray supporting text. Final: question mark icon large, CTA text white. Urgency-focused design, TikTok native feel.', caption_idea: 'No dejes que tu competencia llegue primero. ⚡ #TaplyNFC', hashtags: '#TaplyNFC #Competencia #NFC #TikTok #Colombia #Negocios' },
-  { format: 'Carrusel', topic: 'Lo que pasa después de un tap', image_description: 'Slide 1: "¿Qué pasa después del tap? 🤔". Slides: perfil abre → info guardada → conexión establecida → seguimiento. Slide final: resultado.', prompt_chatgpt: 'Process visualization TikTok carousel, 1080x1080px. Matte black. Slide 1: curiosity hook white text. Each step slide: phone screen mockup showing progression, step number cyan circle, brief white description. Sequence arrows in cyan between slides. Final: success state with stats. Clean tech aesthetic.', caption_idea: 'El tap es solo el comienzo. Lo que viene después es lo importante. 🔗', hashtags: '#TaplyNFC #Proceso #NFC #TikTokColombia #Tech' },
-  { format: 'Historia', topic: '¿Tu Taply funciona sin internet?', image_description: 'Fondo negro. "❌ MITO" rojo. "Tu Taply NO necesita internet" blanco. Cyan: "Solo el teléfono de quien recibe." Ícono NFC onda.', prompt_chatgpt: 'Educational myth-busting TikTok Story, 1080x1920px. Matte black. Top: large red MITO X symbol. Center: bold white explanatory text two lines. Below: cyan NFC wave icon. Bottom: supporting gray detail. Clean typographic hierarchy, TikTok educational style, slight cyan glow.', caption_idea: 'La pregunta que todos hacen 👆 Comparte para que lo sepa tu red.', hashtags: '#TaplyNFC #MitoVsRealidad #NFC #TechTips #Colombia' },
-  { format: 'Historia', topic: 'POV: networking profesional en 2026', image_description: 'Fondo negro. Texto TikTok: "POV: Vas a un evento en 2026." 3 momentos: Sacas Taply → Tap → Contacto guardado. Estética cruda.', prompt_chatgpt: 'TikTok POV narrative Story, 1080x1920px. Matte black. Top: large POV: white TikTok style. Three scenario panels: simple icon + short text each: Sacas tu Taply, Tap en el iPhone, Contacto guardado. Bottom: result emoji and CTA. Raw TikTok aesthetic, bold sans-serif.', caption_idea: 'Así se hace en 2026. ¿Ya eres del futuro? 😏 #TaplyNFC', hashtags: '#POV #TaplyNFC #Networking #TikTokColombia #NFC' },
-  { format: 'Historia', topic: '3 segundos que cambian tu networking', image_description: 'Fondo negro. Cronómetro cyan 3-2-1. Cada segundo: acción. Texto final: "3 segundos. Para siempre."', prompt_chatgpt: 'Countdown Story TikTok style, 1080x1920px. Matte black. Three vertical panels cyan lines: Panel 1 large 3 cyan, hand approaching. Panel 2 large 2 cyan, tap spark. Panel 3 large 1 cyan, contact saved. Bottom: bold white result text. Dynamic energetic clear progression.', caption_idea: '3 segundos que valen más que 200 tarjetas de papel. ⏱️', hashtags: '#TaplyNFC #NFC #Tech #TikTok #Colombia #Networking' },
-  { format: 'Historia', topic: 'Comparación: evento con y sin Taply', image_description: 'Split vertical. Izquierda: caos gris sin tarjetas. Derecha: elegante tap cyan. Etiquetas "SIN TAPLY" vs "CON TAPLY".', prompt_chatgpt: 'Vertical split TikTok Story, 1080x1920px. Left half desaturated gray: stressed person searching pockets at event. Right half cyan accented: clean hand NFC card elegant tap. Bold labels top each side. Center vertical cyan dividing line. TikTok native aesthetic.', caption_idea: '¿De cuál lado quieres estar? 👀 #TaplyNFC', hashtags: '#TaplyNFC #SinVsCon #NFC #TikTokColombia #Networking' },
-  { format: 'Historia', topic: 'Tip viral: el truco del primer tap', image_description: 'Fondo negro. "TRUCO 🔥" en cyan grande. Tip en 3 pasos cortos blancos. CTA: "Pruébalo y cuéntanos." Logo abajo.', prompt_chatgpt: 'Viral tip TikTok Story, 1080x1920px. Matte black. Top: large TRUCO text with fire emoji in cyan. Three numbered tip steps: bold white action, brief gray detail. Bottom: CTA white text, small logo. High energy, curiosity-driving design, TikTok viral aesthetic.', caption_idea: 'El truco que nadie te dice sobre las tarjetas NFC. Guárdalo 👆', hashtags: '#TaplyNFC #Truco #NFC #TikTok #Colombia #Viral' },
-  { format: 'Historia', topic: 'Respuesta a pregunta frecuente', image_description: 'Fondo negro. "PREGUNTA 🤔" cyan arriba. Pregunta en blanco grande. Respuesta en bloques cortos con íconos. "¿Más dudas? DM" abajo.', prompt_chatgpt: 'FAQ answer TikTok Story, 1080x1920px. Matte black. Top: PREGUNTA label cyan. Large bold white question text. Answer section: two-three bullet points with cyan icons, white concise answers. Bottom: DM CTA white text. Clean Q&A design, educational TikTok style, high readability.', caption_idea: 'La pregunta que más nos hacen. Guarda para cuando te la hagan a ti. 📌', hashtags: '#TaplyNFC #FAQ #NFC #TikTok #Colombia #TechTips' },
-]
+Con Taply NFC, cada vez que alguien acerca su celular recibe toda tu información al instante: redes, WhatsApp, web, portafolio, ubicación y más.
 
-const AD_BANK = [
-  { objetivo: 'Conversión — Generar mensajes por WhatsApp', publico_objetivo: 'Hombres y mujeres 25-45 años · Colombia (Bogotá, Medellín, Cali, Barranquilla, Bucaramanga) · Intereses: networking, emprendimiento, negocios, tecnología, ventas · Comportamiento: dueños de negocio, profesionales independientes, uso activo de WhatsApp Business', formato: 'Imagen Única 1080x1080px — Feed Instagram y Facebook', headline: '¿Tu tarjeta de presentación sigue siendo de papel?', descripcion: 'Taply es la tarjeta NFC hecha a mano que comparte TODO tu mundo profesional con un solo tap. Sin apps. Sin fricción. Tu información siempre actualizada.', cta: 'Enviar mensaje → WhatsApp directo', presupuesto_sugerido: 'COP $15.000-$30.000/día · Duración mínima 7 días · Presupuesto total: COP $105.000-$210.000 · CPM estimado Colombia: COP $3.000-$8.000 · Alcance estimado: 5.000-15.000 personas/día', metricas_esperadas: 'CTR esperado: 1.5%-3% · Costo por mensaje: COP $800-$2.500 · Mensajes esperados 7 días: 15-40 contactos · ROAS objetivo: 3x mínimo', image_description: 'Fondo negro matte. Centro: tarjeta Taply con onda cyan. Izquierda: texto "Un tap." blanco grande. Lista íconos cyan (WhatsApp, IG, Web). Abajo: botón cyan "Escríbenos por WhatsApp". Logo esquina superior derecha.', prompt_chatgpt: 'Professional paid social media ad, 1080x1080px. Matte black background subtle texture. Center: sleek black NFC card dramatic product lighting, single spotlight sharp shadow. Left aligned: clean white bold headline, gray supporting text, cyan bullet list social media icons. Bottom right: rounded cyan CTA button white text. Top right: small logo space. Ultra clean conversion-optimized layout, luxury tech feel. 4K commercial photography composite.' },
-  { objetivo: 'Reconocimiento de marca — Alcance masivo en Colombia', publico_objetivo: 'Hombres y mujeres 22-50 años · Colombia nacional · Intereses: emprendimiento, tecnología, networking, marketing digital · Lookalike audience de seguidores actuales · Excluir: quienes interactuaron en 30 días', formato: 'Historia vertical 1080x1920px — Instagram Stories y Facebook Stories', headline: 'La tarjeta que nunca se acaba', descripcion: 'Taply NFC — Hecha a mano en Colombia. Un tap y compartes todo: WhatsApp, redes, portafolio y más. Para profesionales que quieren impresionar desde el primer contacto.', cta: 'Desliza hacia arriba → Ver más', presupuesto_sugerido: 'COP $10.000-$20.000/día · Duración: 14 días · Presupuesto total: COP $140.000-$280.000 · CPM Stories Colombia: COP $2.000-$5.000 · Alcance estimado: 10.000-25.000 personas/día', metricas_esperadas: 'Alcance total: 70.000-175.000 personas · Frecuencia objetivo: 2-3 veces · Swipe up rate: 1%-2.5% · Nuevos seguidores: 50-150 · Costo por seguidor: COP $1.000-$3.500', image_description: 'Historia vertical. Superior: logo Taply centrado pequeño negro. Centro: tarjeta Taply flotante glow cyan dramático, tagline "La tarjeta que nunca se acaba" blanco. Inferior: fondo sólido cyan con texto negro "Conócela →".', prompt_chatgpt: 'Vertical brand awareness Story ad, 1080x1920px. Three zones: Top 20%: small centered white logo pure black. Middle 55%: black background, large NFC card floating dramatic cyan halo glow, elegant white tagline below. Bottom 25%: solid cyan #00CFFF rectangle, bold black CTA text centered right arrow. Clean sharp edge black/cyan. Luxury minimalist brand, Apple-inspired aesthetic.' },
-  { objetivo: 'Tráfico — Visitas al perfil de Instagram de Taply', publico_objetivo: 'Mujeres y hombres 20-35 años · Bogotá, Medellín, Cali · Intereses: diseño, emprendimiento joven, redes sociales, lifestyle · Comportamiento: compradores online frecuentes, early adopters · Solo móvil iOS y Android', formato: 'Carrusel 1080x1080px — Feed Instagram (5 slides)', headline: '¿Qué puede hacer una tarjeta negra por tu carrera?', descripcion: 'Todo. Desliza y descubre cómo Taply está cambiando el networking profesional en Colombia. Hecha a mano, programada para ti.', cta: 'Ver perfil → Instagram Taply', presupuesto_sugerido: 'COP $12.000-$25.000/día · Duración: 10 días · Presupuesto total: COP $120.000-$250.000 · CPC estimado: COP $500-$1.500 · Clics estimados: 80-250/día', metricas_esperadas: 'CTR carrusel: 2%-4% · Costo por clic: COP $500-$1.500 · Visitas al perfil: 500-1.500 total · Nuevos seguidores: 25-150 · Alcance total: 30.000-80.000', image_description: 'Carrusel 5 slides. Slide 1: pregunta provocadora blanca, flecha cyan. Slide 2: tarjetas papel arrugadas desaturadas. Slide 3: Taply con glow cyan dramático. Slide 4: 4 íconos beneficios cyan. Slide 5: "@taplynfccolombia" cyan grande, "Síguenos →" blanco.', prompt_chatgpt: 'Traffic carousel ad series, 1080x1080px per slide. Slide 1: dramatic black, large white question, cyan swipe arrow. Slide 2: desaturated chaos crumpled cards warm dim light. Slide 3: hero product shot black NFC card explosive cyan glow spotlight. Slide 4: clean 2x2 grid four cyan icons white benefit text. Slide 5: pure black large cyan Instagram handle, white follow CTA, subtle logo. Luxury tech brand aesthetic, commercial photography.' },
-  { objetivo: 'Generación de leads — Capturar datos de clientes potenciales', publico_objetivo: 'Dueños de negocio 28-50 años · Colombia nacional · Intereses: ventas B2B, networking empresarial, tecnología empresarial · Cargo: gerentes, directores, representantes de ventas · Ingresos medios-altos', formato: 'Imagen Única 1080x1080px — Feed Facebook (mayor audience B2B)', headline: 'Más de 100 profesionales en Colombia ya usan Taply', descripcion: '¿Cuántos contactos valiosos perdiste este mes? Taply NFC te da presencia profesional instantánea. Un tap y tu información completa.', cta: 'Solicitar información → Formulario Lead', presupuesto_sugerido: 'COP $20.000-$40.000/día · Duración: 14 días · Presupuesto total: COP $280.000-$560.000 · CPL estimado B2B: COP $3.000-$8.000 · Leads esperados: 35-90 en campaña', metricas_esperadas: 'Tasa conversión a lead: 2%-5% · Costo por lead: COP $3.000-$8.000 · Leads totales: 35-90 · Tasa de cierre: 15%-25% · Ventas proyectadas: 5-22 unidades · ROI estimado: 2x-5x', image_description: 'Fondo negro. Arriba: "más de 100 profesionales confían en Taply" blanco con verificación cyan. Centro: 6 íconos profesiones en círculos cyan. Abajo: tarjeta Taply con estadística. CTA: botón "Quiero saber más" cyan.', prompt_chatgpt: 'Lead generation Facebook ad, 1080x1080px. Matte black background. Top: social proof text white with cyan verified checkmark icon. Center: 2x3 grid professional silhouette icons in cyan circles (doctor, lawyer, realtor, chef, designer, entrepreneur). Below: product shot black NFC card white stat text. Bottom: prominent rounded cyan button dark CTA text. Trust-building layout, professional B2B aesthetic, high credibility visual hierarchy.' },
-]
+💡 Sin apps. Sin QR. Sin complicaciones.
+💳 Funciona con iPhone y Android
+📍 Entregas en Cajicá, Chía, Zipaquirá y toda la Sabana Norte
 
-function shuffleArray<T>(array: T[]): T[] {
-  const arr = [...array]
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]]
+👇 Pide tu Taply hoy — link en bio.`,
+    hashtags: '#NegocioDigital #TarjetaNFC #Taply #MarketingLocal #EmprendimientoColombia #SabanaNorte #Cajicá #Chía #NFC #TarjetaDeVisita'
+  },
+  {
+    id: 'c3',
+    codigo: 'C3',
+    titulo: 'Así fue como Bella Pieza pasó del papel a lo digital',
+    subtitulo: 'Testimonio real · Cajicá · Prueba social',
+    objetivo: 'Generar confianza con historia de cliente real',
+    diaSemana: ['Martes (12PM)', 'Sábado (12PM)'],
+    slides: [
+      {
+        numero: 1,
+        rol: 'PORTADA — Testimonio',
+        canvaPrompt: 'Diseño 1080×1080px. Fondo negro (#000000). Texto centrado grande bold blanco: "Así fue como Bella Pieza, Cajicá pasó del papel a lo digital." Comillas tipográficas grandes en cian (#00C2FF) semitransparente de fondo. Franja degradada cian-verde al pie. Logo Taply esquina superior izquierda.',
+        geminiPrompt: 'Escribe la portada de un carrusel testimonio para Instagram de Taply NFC Colombia. El cliente es "Bella Pieza", salón de belleza en Cajicá. El título debe intrigar. Máximo 12 palabras. Solo el título, sin explicaciones.'
+      },
+      {
+        numero: 2,
+        rol: 'ANTES — El problema del cliente',
+        canvaPrompt: 'Diseño 1080×1080px. Fondo negro (#000000). Etiqueta "ANTES" en rojo suave (#F87171) esquina superior derecha. Texto italic blanco con comillas: "Teníamos tarjetas impresas, pero los clientes las perdían o quedaban desactualizadas cada vez que cambiábamos algo." — Bella Pieza, Cajicá. Borde izquierdo de 3px en cian. Franja cian-verde al pie. Logo Taply esquina superior izquierda.',
+        geminiPrompt: 'Escribe una cita testimonio real en primera persona del "ANTES" para Taply NFC Colombia. Cliente: Bella Pieza, salón en Cajicá. El problema: tarjetas de papel se perdían y quedaban desactualizadas. Voz del dueño del negocio, colombiano, natural. Máximo 2 frases. Solo la cita.'
+      },
+      {
+        numero: 3,
+        rol: 'EL CAMBIO — Llegó Taply',
+        canvaPrompt: 'Diseño 1080×1080px. Fondo negro (#000000). Flecha de transformación en cian. Texto bold blanco: "Luego llegó Taply." Subtexto: "Creamos el perfil digital de Bella Pieza en menos de 24 horas. Con fotos, servicios, WhatsApp, Instagram y ubicación en Google Maps." Franja cian-verde al pie. Logo Taply esquina superior izquierda.',
+        geminiPrompt: 'Escribe el texto "El cambio" de un carrusel testimonio de Taply NFC Colombia. Bella Pieza (salón en Cajicá) empezó a usar Taply: proceso simple, rápido (menos de 24h). Máximo 3 frases. Solo el texto.'
+      },
+      {
+        numero: 4,
+        rol: 'DESPUÉS — El resultado',
+        canvaPrompt: 'Diseño 1080×1080px. Fondo negro (#000000). Etiqueta "DESPUÉS" en verde menta (#00FFAA) esquina superior derecha. Texto italic blanco con comillas: "Ahora los clientes se van con todos nuestros datos en el celular. Nos han llegado citas de gente que la clienta anterior les pasó el perfil." — Bella Pieza. Borde izquierdo 3px en verde. Franja cian-verde al pie. Logo Taply esquina superior izquierda.',
+        geminiPrompt: 'Escribe la cita del "después" en primera persona para carrusel testimonio de Taply NFC Colombia. Cliente: Bella Pieza, Cajicá. Resultado: clientes se van con info guardada, perfil se comparte entre clientes, llegaron nuevas citas. Natural, colombiano, emocional. Máximo 3 frases. Solo la cita.'
+      },
+      {
+        numero: 5,
+        rol: 'CTA — ¿Será el próximo?',
+        canvaPrompt: 'Diseño 1080×1080px. Fondo negro (#000000). Texto bold blanco grande: "¿Tu negocio podría ser la próxima historia de éxito?" Subtexto: "Tarjeta Taply NFC desde $100.000 COP · Pago único" Texto accent en degradado cian-verde bold: "Escríbenos 👇" Franja degradada al pie muy vibrante. Logo Taply esquina superior izquierda.',
+        geminiPrompt: 'Escribe el cierre CTA para la última slide de un carrusel testimonio de Taply NFC Colombia. Invitar al lector a ser el próximo cliente. Precio ($100.000 COP pago único). CTA para escribir por DM. Máximo 3 líneas. Solo el texto.'
+      }
+    ],
+    caption: `📖 Historia real — Bella Pieza, Cajicá
+
+Antes: tarjetas de papel que se perdían, quedaban desactualizadas y terminaban en la basura.
+
+Hoy: cada cliente se va con el perfil completo en su celular. Y ese perfil se sigue compartiendo solo entre clientes. 🔄
+
+💳 Un toque. Todo tu negocio.
+💰 Desde $100.000 COP — sin mensualidades
+
+¿Tu negocio podría ser la próxima historia? DM o link en bio 👇`,
+    hashtags: '#Testimonio #TarjetaNFC #Taply #Cajicá #SabanaNorte #NegocioDigital #EmprendimientoColombia #ClientesFelices #NFC'
+  },
+  {
+    id: 'c4',
+    codigo: 'C4',
+    titulo: 'La matemática habla sola: Taply vs tarjetas de papel',
+    subtitulo: 'Comparativa de costos · Objeción de precio',
+    objetivo: 'Destruir la objeción de precio mostrando que Taply es más barata a largo plazo',
+    diaSemana: ['Martes (7PM)', 'Viernes (7PM)'],
+    slides: [
+      {
+        numero: 1,
+        rol: 'PORTADA — Provocación de precio',
+        canvaPrompt: 'Diseño 1080×1080px. Fondo negro (#000000). Texto bold blanco centrado grande: "¿Cuánto llevas gastando en tarjetas que nadie guarda?" Subtexto gris: "Hicimos las cuentas. El resultado te va a sorprender." Franja degradada cian-verde al pie. Logo Taply esquina superior izquierda.',
+        geminiPrompt: 'Escribe la portada para un carrusel Instagram que demuestra que las tarjetas de papel son más caras que una Taply NFC. El hook debe hacer que el dueño de negocio sienta curiosidad sobre cuánto ha "desperdiciado". Máximo 10 palabras título + 1 frase subtítulo. Solo el texto.'
+      },
+      {
+        numero: 2,
+        rol: 'COSTO PAPEL — El problema acumulado',
+        canvaPrompt: 'Diseño 1080×1080px. Fondo negro (#000000). Título "Tarjeta de papel:" en rojo (#F87171) bold. Cálculo visual: "$50.000 × 100 tarjetas" → "3 veces al año" → "$150.000 – $300.000/año" en blanco bold. Texto final en rojo suave: "Y cuando cambias datos, vuelta a empezar." Franja cian-verde al pie. Logo Taply esquina superior izquierda.',
+        geminiPrompt: 'Escribe el texto que muestra el costo real anual de las tarjetas de papel para un negocio colombiano. Usa números: $50.000 por 100 tarjetas, se reimprimen 3-4 veces al año. Hazlo sentir como "dinero botado". Máximo 4 líneas con el cálculo. Solo el texto con los números.'
+      },
+      {
+        numero: 3,
+        rol: 'COSTO TAPLY — La solución inteligente',
+        canvaPrompt: 'Diseño 1080×1080px. Fondo negro (#000000). Título "Taply NFC:" en verde menta (#00FFAA) bold. Texto blanco bold: "$100.000 — una sola vez." Lista verde: ✅ Sin reimpresiones / ✅ Sin papel / ✅ Actualizable siempre / ✅ Para siempre. Texto final verde bold: "Costo adicional: $0" Franja cian-verde al pie. Logo Taply esquina superior izquierda.',
+        geminiPrompt: 'Escribe el texto que muestra que Taply NFC cuesta $100.000 una sola vez. Hazlo sentir como la decisión obvia. Lista de 4 ventajas máximo 3 palabras cada una. Termina con "Costo adicional: $0". Solo el texto.'
+      },
+      {
+        numero: 4,
+        rol: 'COMPARATIVA VISUAL',
+        canvaPrompt: 'Diseño 1080×1080px. Fondo negro (#000000). Tabla 2 columnas: "Papel" (borde rojo) | "Taply" (borde cian). Filas: Se pierde ❌ / Siempre en el celular ✅ | Se desactualiza ❌ / Editable en tiempo real ✅ | Costo recurrente ❌ / Pago único ✅ | No tiene links ❌ / WhatsApp, Maps, web ✅. Franja cian-verde al pie. Logo Taply esquina superior izquierda.',
+        geminiPrompt: 'Escribe una tabla comparativa de 4 filas para carrusel Instagram de Taply NFC Colombia. Columna izquierda: tarjeta de papel (desventajas con ❌). Columna derecha: Taply NFC (ventajas con ✅). Cada punto máximo 4 palabras. Solo la tabla en formato simple.'
+      },
+      {
+        numero: 5,
+        rol: 'CTA — El veredicto',
+        canvaPrompt: 'Diseño 1080×1080px. Fondo negro (#000000). Texto bold blanco grande: "La matemática es clara." Subtexto: "Taply NFC es más barata, más útil y más profesional que cualquier tarjeta de papel." Texto cian bold: "Hacé el cambio hoy 👇" Precio verde bold: "Desde $100.000 COP · Pago único" Franja degradada al pie. Logo Taply esquina superior izquierda.',
+        geminiPrompt: 'Escribe el cierre de ventas de un carrusel comparativo donde se demostró que las tarjetas de papel son más costosas. El veredicto debe ser contundente. Precio: $100.000 COP pago único. Máximo 4 líneas. Solo el texto.'
+      }
+    ],
+    caption: `⚔️ Taply NFC vs. Tarjeta de papel:
+
+📄 Papel: ❌ Se pierde · ❌ Se desactualiza · ❌ Costo cada vez
+💳 Taply: ✅ En el celular siempre · ✅ Editable · ✅ Pago único
+
+La matemática: 100 tarjetas × 3 veces al año = $300.000+
+Taply: $100.000 UNA sola vez.
+
+¿Seguís eligiendo papel? 🤔 DM o link en bio 👇`,
+    hashtags: '#TarjetaNFC #Taply #VsPapel #MarketingDigital #EmprendimientoColombia #NFC #InversionInteligente #TarjetaDigital'
+  },
+  {
+    id: 'c5',
+    codigo: 'C5',
+    titulo: 'Conseguí tu Taply en 4 pasos simples',
+    subtitulo: 'Tutorial de compra · Reducción de fricción',
+    objetivo: 'Eliminar el miedo a comprar explicando el proceso completo de forma simple',
+    diaSemana: ['Miércoles (12PM)', 'Sábado (7PM)'],
+    slides: [
+      {
+        numero: 1,
+        rol: 'PORTADA — Proceso simple',
+        canvaPrompt: 'Diseño 1080×1080px. Fondo negro (#000000). Número "4" en cian muy grande semitransparente de fondo. Encima: texto bold blanco: "¿Cómo conseguís tu Taply?" Subtexto gris: "Más fácil de lo que imaginás." Franja degradada cian-verde al pie. Logo Taply esquina superior izquierda.',
+        geminiPrompt: 'Crea la portada para un carrusel de Instagram de Taply NFC Colombia que explica el proceso de compra en 4 pasos. Objetivo: reducir el miedo a comprar. Título máximo 8 palabras, subtítulo 1 frase. Solo el texto.'
+      },
+      {
+        numero: 2,
+        rol: 'PASO 1 — Escribir y pedir',
+        canvaPrompt: 'Diseño 1080×1080px. Fondo negro (#000000). Número "1" en cian grande semitransparente fondo. Título bold blanco: "Nos escribís y elegís tu plan." Subtexto: "Por DM en Instagram o WhatsApp. Essential ($100.000) o Custom ($130.000)." Indicador ●○○○ en cian. Franja cian-verde al pie. Logo Taply esquina superior izquierda.',
+        geminiPrompt: 'Escribe el texto para el Paso 1 del proceso de compra de Taply NFC Colombia: el cliente escribe por Instagram DM o WhatsApp, elige su plan (Essential $100.000 o Custom $130.000) y paga. Simple y sin complicaciones. Máximo 2-3 frases. Solo el texto.'
+      },
+      {
+        numero: 3,
+        rol: 'PASO 2 — Creamos su perfil',
+        canvaPrompt: 'Diseño 1080×1080px. Fondo negro (#000000). Número "2" cian fondo. Título bold blanco: "Creamos tu perfil digital." Subtexto: "En menos de 24 horas armamos tu página con fotos, servicios, redes y contacto. Vos aprobás antes de imprimir." Indicador ●●○○ en cian. Franja cian-verde al pie. Logo Taply esquina superior izquierda.',
+        geminiPrompt: 'Escribe el Paso 2 del proceso de Taply NFC Colombia: el equipo crea el perfil digital personalizado en menos de 24 horas, el cliente lo revisa y aprueba. Rápido, personalizado, cliente tiene control. Máximo 2-3 frases. Solo el texto.'
+      },
+      {
+        numero: 4,
+        rol: 'PASO 3 — Entregamos la tarjeta',
+        canvaPrompt: 'Diseño 1080×1080px. Fondo negro (#000000). Número "3" cian fondo. Título bold blanco: "Imprimimos y te entregamos tu tarjeta." Subtexto: "Tarjeta NFC con tu diseño personalizado. Lista para usar desde el primer día." Indicador ●●●○ en cian. Franja cian-verde al pie. Logo Taply esquina superior izquierda.',
+        geminiPrompt: 'Escribe el Paso 3 del proceso de Taply NFC Colombia: la tarjeta NFC física se imprime con el diseño aprobado y se entrega. Calidad, personalización, entrega rápida. Máximo 2 frases. Solo el texto.'
+      },
+      {
+        numero: 5,
+        rol: 'PASO 4 + CTA — Empezar a usar',
+        canvaPrompt: 'Diseño 1080×1080px. Fondo negro (#000000). Número "4" cian grande fondo. Título bold blanco: "¡Listo! Empezás a compartir." Subtexto verde (#00FFAA): "Acercás la tarjeta → El celular lee el NFC → Tu perfil abre al instante." Indicador ●●●● cian completo. CTA cian bold: "El paso 4 dura 1 segundo. ¿Empezamos? 👇" Franja degradada vibrante al pie. Logo Taply esquina superior izquierda.',
+        geminiPrompt: 'Escribe el texto final del proceso de compra de Taply NFC Colombia (Paso 4): el cliente ya tiene su tarjeta y la usa por primera vez. Capturar la emoción del primer "tap". CTA para que el lector empiece hoy. Máximo 3 líneas más CTA. Solo el texto.'
+      }
+    ],
+    caption: `⚡ Conseguí tu Taply en 4 pasos simples:
+
+1️⃣ Nos escribís → elegís tu plan → pagás
+2️⃣ En menos de 24h creamos tu perfil digital
+3️⃣ Imprimimos tu tarjeta NFC personalizada
+4️⃣ La recibís → la usás → los clientes te guardan al instante
+
+El paso 4 dura literalmente 1 segundo. Sin fricción. Sin apps.
+
+🔵 Essential: $100.000 COP
+🟢 Custom: $130.000 COP
+
+¿Cuándo empezamos? 👇 DM o link en bio.`,
+    hashtags: '#TarjetaNFC #Taply #ComoFunciona #NFC #EmprendimientoColombia #MarketingDigital #NetworkingDigital #TarjetaDigital'
+  },
+  {
+    id: 'c6',
+    codigo: 'C6',
+    titulo: '5 negocios que NECESITAN una Taply (¿es el tuyo?)',
+    subtitulo: 'Segmentación por nicho · Identificación',
+    objetivo: 'Hacer que cada tipo de negocio se identifique con Taply',
+    diaSemana: ['Jueves (12PM)', 'Domingo (12PM)'],
+    slides: [
+      {
+        numero: 1,
+        rol: 'PORTADA — Identificación',
+        canvaPrompt: 'Diseño 1080×1080px. Fondo negro (#000000). Texto bold blanco grande: "5 negocios que NECESITAN una Taply" — "NECESITAN" en degradado cian-verde. Subtexto gris: "¿Es el tuyo? Deslizá para descubrirlo 👉" Franja degradada cian-verde al pie. Logo Taply esquina superior izquierda.',
+        geminiPrompt: 'Escribe la portada de un carrusel Instagram de Taply NFC Colombia que lista 5 tipos de negocio que más se benefician. El hook debe generar identificación. Título máximo 10 palabras con énfasis en "necesitan". Subtítulo invitando a deslizar. Solo el texto.'
+      },
+      {
+        numero: 2,
+        rol: 'NICHO 1 — Salones de belleza',
+        canvaPrompt: 'Diseño 1080×1080px. Fondo negro (#000000). Número "1" cian grande fondo. Ícono 💇 grande centrado en cian. Título bold blanco: "Salones de belleza y spas." Subtexto: "Tus clientes salen felices y con tu WhatsApp, Instagram y agenda de citas guardados en el celular." Franja cian-verde al pie. Logo Taply esquina superior izquierda.',
+        geminiPrompt: 'Escribe la slide sobre por qué los salones de belleza y spas colombianos necesitan Taply NFC. Específico al dolor del dueño: clientes que no vuelven porque perdieron el contacto. Máximo 2-3 frases. Solo el texto.'
+      },
+      {
+        numero: 3,
+        rol: 'NICHO 2 — Restaurantes',
+        canvaPrompt: 'Diseño 1080×1080px. Fondo negro (#000000). Número "2" cian fondo. Ícono 🍽️ cian. Título bold blanco: "Restaurantes, cafés y bares." Subtexto: "Menú digital, ubicación en Maps, WhatsApp para reservas y tu Instagram en un solo toque." Franja cian-verde al pie. Logo Taply esquina superior izquierda.',
+        geminiPrompt: 'Escribe la slide sobre por qué restaurantes, cafés y bares colombianos necesitan Taply NFC. Incluir: menú digital, ubicación, reservas por WhatsApp. Máximo 2-3 frases. Solo el texto.'
+      },
+      {
+        numero: 4,
+        rol: 'NICHO 3 — Agentes independientes',
+        canvaPrompt: 'Diseño 1080×1080px. Fondo negro (#000000). Número "3" cian fondo. Ícono 💼 cian. Título bold blanco: "Agentes: inmobiliarios, seguros, freelancers." Subtexto: "Portafolio, certificaciones, WhatsApp y LinkedIn con un tap. La primera impresión que cierra negocios." Franja cian-verde al pie. Logo Taply esquina superior izquierda.',
+        geminiPrompt: 'Escribe la slide sobre por qué agentes independientes colombianos (inmobiliarios, de seguros, fotógrafos, consultores) necesitan Taply NFC. Argumento: viven de la primera impresión. Máximo 2-3 frases. Solo el texto.'
+      },
+      {
+        numero: 5,
+        rol: 'NICHO 4 — Profesionales de salud',
+        canvaPrompt: 'Diseño 1080×1080px. Fondo negro (#000000). Número "4" cian fondo. Ícono 🩺 cian. Título bold blanco: "Médicos, psicólogos y nutricionistas." Subtexto: "Consulta, agenda, WhatsApp y ubicación accesibles en un toque. Tus pacientes siempre tendrán tu contacto." Franja cian-verde al pie. Logo Taply esquina superior izquierda.',
+        geminiPrompt: 'Escribe la slide sobre por qué los profesionales de la salud colombianos necesitan Taply NFC. Argumento: sus pacientes necesitan contactarlos fácilmente para citas y emergencias. Máximo 2-3 frases. Solo el texto.'
+      },
+      {
+        numero: 6,
+        rol: 'CTA — ¿Es tu negocio?',
+        canvaPrompt: 'Diseño 1080×1080px. Fondo negro (#000000). Texto bold blanco grande: "¿Tu negocio está en esta lista?" Subtexto: "Entonces ya sabés lo que necesitás." Texto degradado cian-verde bold: "Pedí tu Taply hoy 👇" Precio blanco: "Desde $100.000 COP · Pago único" Franja degradada al pie. Logo Taply esquina superior izquierda.',
+        geminiPrompt: 'Escribe el cierre CTA de un carrusel donde se mostraron 5 tipos de negocio. La invitación debe hacer que quien se identificó quiera escribir de inmediato. Precio $100.000 COP pago único. CTA para DM. Máximo 4 líneas. Solo el texto.'
+      }
+    ],
+    caption: `¿Tu negocio vive del contacto con clientes? Entonces esto es para vos. 👇
+
+Con Taply NFC, tus clientes se van de tu negocio con todos tus datos guardados en el celular.
+
+🔵 Salones y spas · Restaurantes y cafés
+🔵 Agentes inmobiliarios y freelancers
+🔵 Médicos, psicólogos y profesionales de salud
+
+💳 Desde $100.000 COP — pago único, sin mensualidades
+
+¿Tu negocio ya tiene Taply? DM o link en bio 👇`,
+    hashtags: '#TarjetaNFC #Taply #NegocioDigital #NFC #Colombia #EmprendimientoCO #MarketingDigital'
+  },
+  {
+    id: 'c7',
+    codigo: 'C7',
+    titulo: 'Taply para tu equipo — Paquetes empresariales',
+    subtitulo: 'B2B · Equipos · Descuentos por volumen',
+    objetivo: 'Captar clientes empresariales que necesitan múltiples tarjetas',
+    diaSemana: ['Jueves (7PM)', 'Domingo (7PM)'],
+    slides: [
+      {
+        numero: 1,
+        rol: 'PORTADA — Escala empresarial',
+        canvaPrompt: 'Diseño 1080×1080px. Fondo negro (#000000). Texto bold blanco centrado grande: "Taply para tu equipo." Subtexto gris: "Digitaliza la imagen de toda tu empresa con un tap." Grid sutil de íconos de tarjetas NFC en cian muy tenue de fondo. Franja degradada cian-verde al pie. Logo Taply esquina superior izquierda.',
+        geminiPrompt: 'Crea la portada para un carrusel Instagram de Taply NFC Colombia dirigido a empresas y equipos (B2B). Mensaje: Taply no es solo para individuos, también para empresas. Título máximo 8 palabras, subtítulo 1 frase. Tono profesional y aspiracional. Solo el texto.'
+      },
+      {
+        numero: 2,
+        rol: 'PROBLEMA EMPRESA — Costo en volumen',
+        canvaPrompt: 'Diseño 1080×1080px. Fondo negro (#000000). Texto bold blanco: "Tu equipo de ventas tiene 10 personas." Cálculo en rojo suave: "10 personas × $50.000 = $500.000 cada vez que actualizan datos." Debajo en cian: "Hay una forma más inteligente." Franja cian-verde al pie. Logo Taply esquina superior izquierda.',
+        geminiPrompt: 'Escribe el texto que muestra el problema de costo para una empresa colombiana con tarjetas de papel para su equipo. Cálculo: 10 personas × $50.000 = $500.000 cada reimpresión. Hazlo sentir como dinero malgastado. Máximo 3-4 líneas. Solo el texto.'
+      },
+      {
+        numero: 3,
+        rol: 'SOLUCIÓN — Paquetes Taply',
+        canvaPrompt: 'Diseño 1080×1080px. Fondo negro (#000000). Título bold blanco: "Paquetes Taply para equipos:" Tres bloques: 🏢 PYME (5-9 tarjetas) $115.000/u | 🏬 CORPORATIVO (10-24) $100.000/u | 🏭 ENTERPRISE (25+) $85.000/u. Cada bloque con borde cian sutil. Franja cian-verde al pie. Logo Taply esquina superior izquierda.',
+        geminiPrompt: 'Escribe el texto para la slide que presenta los paquetes empresariales de Taply NFC Colombia. PYME 5-9 tarjetas $115.000/u | CORPORATIVO 10-24 tarjetas $100.000/u | ENTERPRISE 25+ tarjetas $85.000/u. Claro y directo. Máximo 5 líneas. Solo el texto.'
+      },
+      {
+        numero: 4,
+        rol: 'QUÉ INCLUYE',
+        canvaPrompt: 'Diseño 1080×1080px. Fondo negro (#000000). Título blanco bold: "Cada tarjeta del paquete incluye:" Lista con checks verdes: ✓ Perfil digital individual / ✓ Diseño con identidad de la empresa / ✓ Foto y cargo de cada miembro / ✓ Links: WhatsApp, email, LinkedIn / ✓ 6 meses de soporte incluido. Franja cian-verde al pie. Logo Taply esquina superior izquierda.',
+        geminiPrompt: 'Escribe la lista de lo que incluye cada tarjeta Taply en un paquete empresarial. Énfasis en personalización individual, identidad visual, links directos, soporte. Máximo 5 ítems con ✓. Solo la lista con título corto.'
+      },
+      {
+        numero: 5,
+        rol: 'CTA — Cotización empresarial',
+        canvaPrompt: 'Diseño 1080×1080px. Fondo negro (#000000). Texto bold blanco grande: "¿Tu empresa lista para el siguiente nivel?" Subtexto: "Cotización personalizada en menos de 24h." Líneas en cian: "📩 Escríbenos al DM" Precio verde bold: "Desde $85.000 COP por tarjeta para 25+ unidades." Franja degradada vibrante al pie. Logo Taply esquina superior izquierda.',
+        geminiPrompt: 'Escribe el cierre CTA para carrusel empresarial de Taply NFC Colombia. Dirigido a gerentes o encargados de equipos. Cotización en menos de 24 horas. Precio desde $85.000 COP (25+ unidades). Invitación al DM profesional. Máximo 4 líneas. Solo el texto.'
+      }
+    ],
+    caption: `🏢 ¿Tenés un equipo de ventas, inmobiliaria o consultora?
+
+Con Taply para Equipos, cada miembro tiene su propia tarjeta NFC con su perfil, foto, cargo y contacto — con la identidad visual de tu empresa.
+
+📦 Paquetes empresariales:
+• 5-9 tarjetas → $115.000/u
+• 10-24 tarjetas → $100.000/u
+• 25+ tarjetas → $85.000/u
+
+✅ Imagen profesional unificada
+✅ Cotización en menos de 24h
+
+Un equipo con Taply no reparte papeles — deja huella digital. 🤝
+¿Cuántas tarjetas necesitás? DM o link en bio 👇`,
+    hashtags: '#EmpresaDigital #TarjetaNFC #Taply #B2B #EquipoVentas #NFC #Colombia #Pyme #CorporativoDigital'
   }
-  return arr
-}
+]
 
-function getWeekStart(date: Date): Date {
-  const d = new Date(date)
-  const day = d.getDay()
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1)
-  d.setDate(diff); d.setHours(0, 0, 0, 0); return d
-}
-
-function formatWeekDate(dateStr: string): string {
-  const d = new Date(dateStr + 'T00:00:00')
-  const end = new Date(d); end.setDate(end.getDate() + 6)
-  return `${d.toLocaleDateString('es-CO', { day: 'numeric', month: 'short' })} – ${end.toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' })}`
-}
-
-const DAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
+const HORARIO = [
+  { dia: 'Lunes',     am: 'C1 — Hook Papel', pm: 'C2 — Negocio Físico' },
+  { dia: 'Martes',    am: 'C3 — Testimonio Bella Pieza', pm: 'C4 — Matemática del precio' },
+  { dia: 'Miércoles', am: 'C5 — Cómo conseguir tu Taply', pm: 'C5 — Cómo conseguir tu Taply' },
+  { dia: 'Jueves',    am: 'C6 — 5 negocios que lo necesitan', pm: 'C7 — Paquetes empresariales' },
+  { dia: 'Viernes',   am: 'C2 — Negocio Físico', pm: 'C4 — Matemática del precio' },
+  { dia: 'Sábado',    am: 'C3 — Testimonio Bella Pieza', pm: 'C5 — Cómo conseguir tu Taply' },
+  { dia: 'Domingo',   am: 'C6 — 5 negocios que lo necesitan', pm: 'C7 — Paquetes empresariales' },
+]
 
 export default function ContenidoPage() {
   const isMobile = useIsMobile()
-  const [posts, setPosts] = useState<ContentPost[]>([])
-  const [ads, setAds] = useState<AdPost[]>([])
-  const [loading, setLoading] = useState(true)
-  const [generating, setGenerating] = useState(false)
-  const [generatingAd, setGeneratingAd] = useState(false)
-  const [expandedId, setExpandedId] = useState<string | null>(null)
-  const [expandedAdId, setExpandedAdId] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState<'calendario' | 'carruseles'>('carruseles')
+  const [activeCarrusel, setActiveCarrusel] = useState(0)
+  const [expandedSlide, setExpandedSlide] = useState<string | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
-  const [weekStart, setWeekStart] = useState(() => getWeekStart(new Date()).toISOString().split('T')[0])
-  const [activeTab, setActiveTab] = useState<'calendario' | 'pauta'>('calendario')
-  const [platformFilter, setPlatformFilter] = useState<'Instagram' | 'TikTok'>('Instagram')
 
-  async function fetchPosts(week: string) {
-    setLoading(true)
-    const { data } = await supabase.from('content_board').select('*').eq('week_start', week).order('day_index')
-    setPosts(data ?? []); setLoading(false)
-  }
-
-  async function fetchAds() {
-    const { data } = await supabase.from('ad_board').select('*').order('created_at', { ascending: false })
-    setAds(data ?? [])
-  }
-
-  useEffect(() => { fetchPosts(weekStart); fetchAds() }, [weekStart])
-
-  async function generateWeek() {
-    setGenerating(true); setExpandedId(null)
-
-    const { data: usedData } = await supabase.from('content_board').select('topic')
-    const usedTopics = new Set((usedData ?? []).map((d: { topic: string }) => d.topic))
-
-    // Generar 7 para Instagram
-    const igAvailable = CONTENT_BANK_IG.filter(i => !usedTopics.has(i.topic))
-    const igBank = igAvailable.length >= 7 ? igAvailable : CONTENT_BANK_IG
-    const igSelected: typeof CONTENT_BANK_IG = []
-    for (let d = 0; d < 7; d++) {
-      const format = CADENCE_IG[d]
-      const options = shuffleArray(igBank.filter(i => i.format === format && !igSelected.find(s => s.topic === i.topic)))
-      if (options.length > 0) igSelected.push(options[0])
-      else {
-        const fallback = shuffleArray(igBank.filter(i => !igSelected.find(s => s.topic === i.topic)))
-        if (fallback.length > 0) igSelected.push(fallback[0])
-      }
-    }
-
-    // Generar 7 para TikTok
-    const tkAvailable = CONTENT_BANK_TK.filter(i => !usedTopics.has(i.topic))
-    const tkBank = tkAvailable.length >= 7 ? tkAvailable : CONTENT_BANK_TK
-    const tkSelected: typeof CONTENT_BANK_TK = []
-    for (let d = 0; d < 7; d++) {
-      const format = CADENCE_TK[d]
-      const options = shuffleArray(tkBank.filter(i => i.format === format && !tkSelected.find(s => s.topic === i.topic)))
-      if (options.length > 0) tkSelected.push(options[0])
-      else {
-        const fallback = shuffleArray(tkBank.filter(i => !tkSelected.find(s => s.topic === i.topic)))
-        if (fallback.length > 0) tkSelected.push(fallback[0])
-      }
-    }
-
-    await supabase.from('content_board').delete().eq('week_start', weekStart)
-
-    const igRows = igSelected.map((item, i) => ({ week_start: weekStart, day_index: i, day_name: DAYS[i], platform: 'Instagram', format: item.format, topic: item.topic, image_description: item.image_description, prompt_chatgpt: item.prompt_chatgpt, caption_idea: item.caption_idea, hashtags: item.hashtags, status: 'pendiente', script: '', script_generated: false }))
-    const tkRows = tkSelected.map((item, i) => ({ week_start: weekStart, day_index: i, day_name: DAYS[i], platform: 'TikTok', format: item.format, topic: item.topic, image_description: item.image_description, prompt_chatgpt: item.prompt_chatgpt, caption_idea: item.caption_idea, hashtags: item.hashtags, status: 'pendiente', script: '', script_generated: false }))
-
-    await supabase.from('content_board').insert([...igRows, ...tkRows])
-    await fetchPosts(weekStart); setGenerating(false)
-  }
-
-  async function generateAd() {
-    setGeneratingAd(true)
-    const usedObjetivos = new Set(ads.map(a => a.objetivo))
-    const available = AD_BANK.filter(a => !usedObjetivos.has(a.objetivo))
-    const bank = available.length > 0 ? available : AD_BANK
-    const selected = shuffleArray(bank)[0]
-    await supabase.from('ad_board').insert([selected])
-    await fetchAds(); setGeneratingAd(false); setActiveTab('pauta')
-  }
-
-  async function toggleStatus(post: ContentPost) {
-    const newStatus = post.status === 'pendiente' ? 'publicado' : 'pendiente'
-    await supabase.from('content_board').update({ status: newStatus }).eq('id', post.id)
-    fetchPosts(weekStart)
-  }
-
-  async function deleteAd(id: string) {
-    await supabase.from('ad_board').delete().eq('id', id); fetchAds()
-  }
-
-  function copyText(text: string, id: string) {
-    navigator.clipboard.writeText(text); setCopiedId(id)
+  function copiar(texto: string, id: string) {
+    navigator.clipboard.writeText(texto)
+    setCopiedId(id)
     setTimeout(() => setCopiedId(null), 2000)
   }
 
-  function prevWeek() { const d = new Date(weekStart + 'T00:00:00'); d.setDate(d.getDate() - 7); setWeekStart(d.toISOString().split('T')[0]); setExpandedId(null) }
-  function nextWeek() { const d = new Date(weekStart + 'T00:00:00'); d.setDate(d.getDate() + 7); setWeekStart(d.toISOString().split('T')[0]); setExpandedId(null) }
-
-  const isCurrentWeek = weekStart === getWeekStart(new Date()).toISOString().split('T')[0]
-  const filteredPosts = posts.filter(p => p.platform === platformFilter)
-  const igPublished = posts.filter(p => p.platform === 'Instagram' && p.status === 'publicado').length
-  const tkPublished = posts.filter(p => p.platform === 'TikTok' && p.status === 'publicado').length
+  const carrusel = CARRUSELES[activeCarrusel]
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
 
-      {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
-        <div>
-          <h1 style={{ margin: 0, fontSize: isMobile ? '24px' : '32px', fontWeight: 900 }} className="taply-gradient-text">Contenido</h1>
-          <p style={{ margin: '4px 0 0', fontSize: '13px', color: '#6b7280' }}>7 posts diarios por plataforma + Pautas publicitarias</p>
-        </div>
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-          <button onClick={generateAd} disabled={generatingAd}
-            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px', borderRadius: '12px', fontWeight: 700, fontSize: '13px', cursor: generatingAd ? 'not-allowed' : 'pointer', border: '1px solid #fbbf2444', background: generatingAd ? '#2a2a2a' : '#fbbf240d', color: generatingAd ? '#6b7280' : '#fbbf24' }}>
-            <Megaphone size={15} />{generatingAd ? 'Generando...' : '📢 Nueva Pauta'}
-          </button>
-          {activeTab === 'calendario' && (
-            <button onClick={generateWeek} disabled={generating}
-              style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px', borderRadius: '12px', fontWeight: 700, fontSize: '13px', cursor: generating ? 'not-allowed' : 'pointer', border: 'none', background: generating ? '#2a2a2a' : 'linear-gradient(90deg, #00cfff, #00ff94)', color: generating ? '#6b7280' : '#0d0d0d' }}>
-              <RefreshCw size={15} />{generating ? 'Generando...' : posts.length > 0 ? '🎲 Nueva Semana' : '✨ Generar Semana'}
-            </button>
-          )}
-        </div>
+      <div>
+        <h1 style={{ margin: 0, fontSize: isMobile ? '24px' : '32px', fontWeight: 900 }} className="taply-gradient-text">
+          Contenido Instagram
+        </h1>
+        <p style={{ margin: '4px 0 0', fontSize: '13px', color: '#6b7280' }}>
+          7 carruseles · 2 publicaciones diarias · Prompts para Canva + Gemini · Venta orgánica
+        </p>
       </div>
 
-      {/* Tabs principales */}
       <div style={{ display: 'flex', gap: '8px', padding: '4px', borderRadius: '12px', backgroundColor: '#161616', border: '1px solid #1f1f1f' }}>
+        <button onClick={() => setActiveTab('carruseles')} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '10px 8px', borderRadius: '9px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', border: 'none', backgroundColor: activeTab === 'carruseles' ? '#00cfff0d' : 'transparent', color: activeTab === 'carruseles' ? '#00cfff' : '#6b7280', outline: activeTab === 'carruseles' ? '1px solid #00cfff22' : 'none' }}>
+          <Layers size={14} /> Carruseles
+        </button>
         <button onClick={() => setActiveTab('calendario')} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '10px 8px', borderRadius: '9px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', border: 'none', backgroundColor: activeTab === 'calendario' ? '#00cfff0d' : 'transparent', color: activeTab === 'calendario' ? '#00cfff' : '#6b7280', outline: activeTab === 'calendario' ? '1px solid #00cfff22' : 'none' }}>
           <Calendar size={14} /> Calendario Semanal
         </button>
-        <button onClick={() => setActiveTab('pauta')} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '10px 8px', borderRadius: '9px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', border: 'none', backgroundColor: activeTab === 'pauta' ? '#fbbf240d' : 'transparent', color: activeTab === 'pauta' ? '#fbbf24' : '#6b7280', outline: activeTab === 'pauta' ? '1px solid #fbbf2422' : 'none' }}>
-          <Megaphone size={14} /> Pautas Publicitarias {ads.length > 0 && <span style={{ padding: '1px 6px', borderRadius: '999px', fontSize: '10px', backgroundColor: '#fbbf2422', color: '#fbbf24' }}>{ads.length}</span>}
-        </button>
       </div>
 
-      {/* ── CALENDARIO ── */}
-      {activeTab === 'calendario' && (
+      {activeTab === 'carruseles' && (
         <>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '14px 16px', borderRadius: '14px', backgroundColor: '#161616', border: '1px solid #1f1f1f' }}>
-            <button onClick={prevWeek} style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '7px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', backgroundColor: 'transparent', border: '1px solid #2a2a2a', color: '#6b7280' }}>
-              <ChevronLeft size={14} />{isMobile ? '' : ' Anterior'}
-            </button>
-            <div style={{ flex: 1, textAlign: 'center' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                <Calendar size={14} style={{ color: '#00cfff' }} />
-                <span style={{ fontSize: isMobile ? '12px' : '14px', fontWeight: 700, color: '#f0f0f0' }}>{formatWeekDate(weekStart)}</span>
-                {isCurrentWeek && <span style={{ padding: '2px 8px', borderRadius: '999px', fontSize: '10px', fontWeight: 700, backgroundColor: '#00cfff0d', color: '#00cfff', border: '1px solid #00cfff22' }}>Esta semana</span>}
-              </div>
-              {posts.length > 0 && <p style={{ margin: '4px 0 0', fontSize: '11px', color: '#6b7280' }}>📸 {igPublished}/7 · 🎵 {tkPublished}/7 publicados</p>}
-            </div>
-            <button onClick={nextWeek} style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '7px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', backgroundColor: 'transparent', border: '1px solid #2a2a2a', color: '#6b7280' }}>
-              {isMobile ? '' : 'Siguiente '}<ChevronRight size={14} />
-            </button>
+          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+            {CARRUSELES.map((c, i) => (
+              <button key={c.id} onClick={() => { setActiveCarrusel(i); setExpandedSlide(null) }} style={{ padding: '7px 14px', borderRadius: '20px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', border: '1px solid', transition: 'all .15s', borderColor: activeCarrusel === i ? '#00cfff' : '#1f1f1f', backgroundColor: activeCarrusel === i ? '#00cfff14' : '#161616', color: activeCarrusel === i ? '#00cfff' : '#6b7280' }}>
+                {c.codigo}
+              </button>
+            ))}
           </div>
 
-          {/* Tabs plataforma */}
-          {posts.length > 0 && (
-            <div style={{ display: 'flex', gap: '8px', padding: '4px', borderRadius: '12px', backgroundColor: '#161616', border: '1px solid #1f1f1f' }}>
-              {(['Instagram', 'TikTok'] as const).map(p => {
-                const pc = PLATFORM_CONFIG[p]
-                const count = posts.filter(x => x.platform === p).length
-                const published = posts.filter(x => x.platform === p && x.status === 'publicado').length
-                return (
-                  <button key={p} onClick={() => setPlatformFilter(p)}
-                    style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '10px 8px', borderRadius: '9px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', border: 'none', backgroundColor: platformFilter === p ? pc.bg : 'transparent', color: platformFilter === p ? pc.color : '#6b7280', outline: platformFilter === p ? `1px solid ${pc.border}` : 'none' }}>
-                    {pc.emoji} {p} <span style={{ fontSize: '11px', color: platformFilter === p ? pc.color : '#4b5563' }}>{published}/{count}</span>
-                  </button>
-                )
-              })}
+          <div style={{ borderRadius: '16px', backgroundColor: '#161616', border: '1px solid #00cfff22', padding: '20px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px', marginBottom: '16px' }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginBottom: '6px' }}>
+                  <span style={{ padding: '3px 12px', borderRadius: '20px', fontSize: '11px', fontWeight: 800, background: 'linear-gradient(90deg,#00cfff,#00ff94)', color: '#0d0d0d' }}>{carrusel.codigo}</span>
+                  <span style={{ fontSize: '11px', color: '#6b7280' }}>{carrusel.slides.length} diapositivas</span>
+                </div>
+                <h2 style={{ margin: 0, fontSize: isMobile ? '16px' : '18px', fontWeight: 800, color: '#f0f0f0', lineHeight: '1.3' }}>{carrusel.titulo}</h2>
+                <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#6b7280' }}>{carrusel.subtitulo}</p>
+              </div>
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                {carrusel.diaSemana.map((d, i) => (
+                  <span key={i} style={{ padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 600, backgroundColor: i === 0 ? '#00cfff0d' : '#00ff940d', border: `1px solid ${i === 0 ? '#00cfff22' : '#00ff9422'}`, color: i === 0 ? '#00cfff' : '#00ff94' }}>
+                    {i === 0 ? '🌅' : '🌙'} {d}
+                  </span>
+                ))}
+              </div>
             </div>
-          )}
+            <div style={{ padding: '12px 14px', borderRadius: '10px', backgroundColor: '#0d0d0d', border: '1px solid #1f1f1f' }}>
+              <span style={{ fontSize: '11px', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>🎯 Objetivo · </span>
+              <span style={{ fontSize: '12px', color: '#9ca3af' }}>{carrusel.objetivo}</span>
+            </div>
+          </div>
 
-          {!loading && posts.length === 0 && (
-            <div style={{ borderRadius: '16px', padding: '48px 24px', textAlign: 'center', backgroundColor: '#161616', border: '1px dashed #2a2a2a' }}>
-              <Sparkles size={36} style={{ margin: '0 auto 16px', display: 'block', color: '#374151' }} />
-              <p style={{ margin: '0 0 8px', fontSize: '16px', fontWeight: 700, color: '#f0f0f0' }}>No hay contenido para esta semana</p>
-              <p style={{ margin: '0 0 20px', fontSize: '13px', color: '#6b7280' }}>Genera 7 posts para Instagram + 7 posts para TikTok</p>
-              <button onClick={generateWeek} disabled={generating}
-                style={{ padding: '12px 28px', borderRadius: '12px', fontWeight: 700, fontSize: '14px', cursor: 'pointer', border: 'none', background: 'linear-gradient(90deg, #00cfff, #00ff94)', color: '#0d0d0d' }}>
-                ✨ Generar Semana
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {carrusel.slides.map((slide) => {
+              const slideId = `${carrusel.id}-${slide.numero}`
+              const isOpen = expandedSlide === slideId
+              const canvaCopied = copiedId === `${slideId}-canva`
+              const geminiCopied = copiedId === `${slideId}-gemini`
+              return (
+                <div key={slideId} style={{ borderRadius: '14px', backgroundColor: '#161616', border: `1px solid ${isOpen ? '#00cfff33' : '#1f1f1f'}`, overflow: 'hidden' }}>
+                  <button onClick={() => setExpandedSlide(isOpen ? null : slideId)} style={{ width: '100%', padding: '14px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', backgroundColor: 'transparent', border: 'none', textAlign: 'left' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span style={{ minWidth: '28px', height: '28px', borderRadius: '8px', background: isOpen ? 'linear-gradient(135deg,#00cfff,#00ff94)' : '#0d0d0d', border: `1px solid ${isOpen ? 'transparent' : '#2a2a2a'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 800, color: isOpen ? '#0d0d0d' : '#6b7280' }}>{slide.numero}</span>
+                      <p style={{ margin: 0, fontSize: '12px', fontWeight: 800, color: isOpen ? '#00cfff' : '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{slide.rol}</p>
+                    </div>
+                    {isOpen ? <ChevronUp size={15} style={{ color: '#00cfff' }} /> : <ChevronDown size={15} style={{ color: '#4b5563' }} />}
+                  </button>
+
+                  {isOpen && (
+                    <div style={{ borderTop: '1px solid #00cfff22', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      <div style={{ borderRadius: '12px', backgroundColor: '#0d0d0d', border: '1px solid #2a2a2a', padding: '14px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <ImageIcon size={13} style={{ color: '#a78bfa' }} />
+                            <span style={{ fontSize: '11px', fontWeight: 700, color: '#a78bfa', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Prompt Canva</span>
+                          </div>
+                          <button onClick={() => copiar(slide.canvaPrompt, `${slideId}-canva`)} style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '5px 10px', borderRadius: '7px', fontSize: '11px', fontWeight: 700, cursor: 'pointer', backgroundColor: canvaCopied ? '#00ff940d' : '#a78bfa12', border: `1px solid ${canvaCopied ? '#00ff9433' : '#a78bfa33'}`, color: canvaCopied ? '#00ff94' : '#a78bfa' }}>
+                            {canvaCopied ? <><Check size={11} /> Copiado</> : <><Copy size={11} /> Copiar</>}
+                          </button>
+                        </div>
+                        <p style={{ margin: 0, fontSize: '12.5px', color: '#d1d5db', lineHeight: '1.75' }}>{slide.canvaPrompt}</p>
+                      </div>
+
+                      <div style={{ borderRadius: '12px', backgroundColor: '#0d0d0d', border: '1px solid #00cfff22', padding: '14px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <BookOpen size={13} style={{ color: '#00cfff' }} />
+                            <span style={{ fontSize: '11px', fontWeight: 700, color: '#00cfff', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Prompt Gemini</span>
+                          </div>
+                          <button onClick={() => copiar(slide.geminiPrompt, `${slideId}-gemini`)} style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '5px 10px', borderRadius: '7px', fontSize: '11px', fontWeight: 700, cursor: 'pointer', backgroundColor: geminiCopied ? '#00ff940d' : '#00cfff0d', border: `1px solid ${geminiCopied ? '#00ff9433' : '#00cfff22'}`, color: geminiCopied ? '#00ff94' : '#00cfff' }}>
+                            {geminiCopied ? <><Check size={11} /> Copiado</> : <><Copy size={11} /> Copiar</>}
+                          </button>
+                        </div>
+                        <p style={{ margin: 0, fontSize: '12.5px', color: '#d1d5db', lineHeight: '1.75', fontFamily: 'monospace' }}>{slide.geminiPrompt}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+
+          <div style={{ borderRadius: '16px', backgroundColor: '#161616', border: '1px solid #1f1f1f', padding: '20px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+              <span style={{ fontSize: '13px', fontWeight: 700, color: '#f0f0f0' }}>✍️ Caption para Instagram</span>
+              <button onClick={() => copiar(`${carrusel.caption}\n\n${carrusel.hashtags}`, `${carrusel.id}-caption`)} style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', backgroundColor: copiedId === `${carrusel.id}-caption` ? '#00ff940d' : '#00cfff0d', border: `1px solid ${copiedId === `${carrusel.id}-caption` ? '#00ff9433' : '#00cfff22'}`, color: copiedId === `${carrusel.id}-caption` ? '#00ff94' : '#00cfff' }}>
+                {copiedId === `${carrusel.id}-caption` ? <><Check size={12} /> Copiado</> : <><Copy size={12} /> Copiar todo</>}
               </button>
             </div>
-          )}
-
-          {!loading && filteredPosts.length > 0 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {filteredPosts.map(post => {
-                const pc = PLATFORM_CONFIG[post.platform as keyof typeof PLATFORM_CONFIG] ?? PLATFORM_CONFIG['Instagram']
-                const fc = FORMAT_CONFIG[post.format as keyof typeof FORMAT_CONFIG]
-                const isExpanded = expandedId === post.id
-                const isCopied = copiedId === post.id
-                return (
-                  <div key={post.id} style={{ borderRadius: '16px', backgroundColor: '#161616', border: `1px solid ${isExpanded ? pc.color + '44' : '#1f1f1f'}`, overflow: 'hidden', opacity: post.status === 'publicado' && !isExpanded ? 0.55 : 1 }}>
-                    <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                          <span style={{ fontSize: '11px', fontWeight: 700, color: '#6b7280' }}>{post.day_name}</span>
-                          <span style={{ padding: '3px 10px', borderRadius: '999px', fontSize: '11px', fontWeight: 700, backgroundColor: pc.bg, color: pc.color, border: `1px solid ${pc.border}` }}>{pc.emoji} {post.platform}</span>
-                          <span style={{ padding: '3px 10px', borderRadius: '999px', fontSize: '11px', fontWeight: 600, backgroundColor: '#0d0d0d', color: '#9ca3af', border: '1px solid #2a2a2a' }}>{fc?.emoji} {post.format} · {fc?.desc}</span>
-                        </div>
-                        <button onClick={() => toggleStatus(post)} style={{ width: '24px', height: '24px', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: post.status === 'publicado' ? '#00ff940d' : 'transparent', border: post.status === 'publicado' ? '1px solid #00ff9433' : '1px solid #2a2a2a' }}>
-                          {post.status === 'publicado' && <Check size={13} style={{ color: '#00ff94' }} />}
-                        </button>
-                      </div>
-                      <p style={{ margin: 0, fontSize: '14px', fontWeight: 800, color: '#f0f0f0', lineHeight: '1.3' }}>{post.topic}</p>
-                      <p style={{ margin: 0, fontSize: '12px', color: '#9ca3af', lineHeight: '1.5' }}>{post.caption_idea}</p>
-                      <p style={{ margin: 0, fontSize: '11px', color: pc.color, opacity: 0.7 }}>{post.hashtags}</p>
-                      <button onClick={() => setExpandedId(isExpanded ? null : post.id)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '8px', borderRadius: '9px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', backgroundColor: isExpanded ? pc.bg : '#0d0d0d', border: `1px solid ${isExpanded ? pc.border : '#2a2a2a'}`, color: isExpanded ? pc.color : '#6b7280' }}>
-                        {isExpanded ? <><ChevronUp size={13} /> Cerrar</> : <><ChevronDown size={13} /> Ver imagen + Prompt ChatGPT</>}
-                      </button>
-                    </div>
-                    {isExpanded && (
-                      <div style={{ borderTop: `1px solid ${pc.border}`, padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                        <div style={{ borderRadius: '12px', backgroundColor: '#0d0d0d', padding: '14px', border: '1px solid #2a2a2a' }}>
-                          <p style={{ margin: '0 0 8px', fontSize: '11px', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>🖼️ Qué plasmar en la imagen</p>
-                          <p style={{ margin: 0, fontSize: '13px', color: '#e5e7eb', lineHeight: '1.7' }}>{post.image_description}</p>
-                        </div>
-                        <div style={{ borderRadius: '12px', backgroundColor: '#0d0d0d', padding: '14px', border: `1px solid ${pc.border}` }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                            <p style={{ margin: 0, fontSize: '11px', fontWeight: 700, color: pc.color, textTransform: 'uppercase', letterSpacing: '0.05em' }}>✨ Prompt para ChatGPT</p>
-                            <button onClick={() => copyText(post.prompt_chatgpt, post.id)} style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '5px 10px', borderRadius: '7px', fontSize: '11px', fontWeight: 700, cursor: 'pointer', backgroundColor: isCopied ? '#00ff940d' : pc.bg, border: `1px solid ${isCopied ? '#00ff9433' : pc.border}`, color: isCopied ? '#00ff94' : pc.color }}>
-                              {isCopied ? <><Check size={11} /> Copiado</> : <><Copy size={11} /> Copiar</>}
-                            </button>
-                          </div>
-                          <p style={{ margin: 0, fontSize: '12px', color: '#d1d5db', lineHeight: '1.8', fontFamily: 'monospace' }}>{post.prompt_chatgpt}</p>
-                        </div>
-                        <div style={{ borderRadius: '12px', backgroundColor: '#0d0d0d', padding: '14px', border: '1px solid #2a2a2a' }}>
-                          <p style={{ margin: '0 0 8px', fontSize: '11px', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase' }}>💬 Caption + Hashtags</p>
-                          <p style={{ margin: '0 0 6px', fontSize: '13px', color: '#e5e7eb', lineHeight: '1.6' }}>{post.caption_idea}</p>
-                          <p style={{ margin: 0, fontSize: '11px', color: pc.color, opacity: 0.8 }}>{post.hashtags}</p>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          )}
+            <pre style={{ margin: 0, fontSize: '12.5px', color: '#e5e7eb', lineHeight: '1.75', whiteSpace: 'pre-wrap', fontFamily: 'inherit', backgroundColor: '#0d0d0d', borderRadius: '10px', padding: '14px', border: '1px solid #1f1f1f' }}>{carrusel.caption}</pre>
+            <p style={{ margin: '10px 0 0', fontSize: '12px', color: '#00cfff', opacity: 0.8, lineHeight: '1.6' }}>{carrusel.hashtags}</p>
+          </div>
         </>
       )}
 
-      {/* ── PAUTAS ── */}
-      {activeTab === 'pauta' && (
+      {activeTab === 'calendario' && (
         <>
-          {ads.length === 0 && (
-            <div style={{ borderRadius: '16px', padding: '48px 24px', textAlign: 'center', backgroundColor: '#161616', border: '1px dashed #fbbf2422' }}>
-              <Megaphone size={36} style={{ margin: '0 auto 16px', display: 'block', color: '#fbbf2433' }} />
-              <p style={{ margin: '0 0 8px', fontSize: '16px', fontWeight: 700, color: '#f0f0f0' }}>No hay pautas generadas aún</p>
-              <p style={{ margin: '0 0 20px', fontSize: '13px', color: '#6b7280' }}>Genera una pauta ultra-detallada lista para Meta Ads</p>
-              <button onClick={generateAd} disabled={generatingAd}
-                style={{ padding: '12px 28px', borderRadius: '12px', fontWeight: 700, fontSize: '14px', cursor: 'pointer', border: 'none', background: 'linear-gradient(90deg, #fbbf24, #f59e0b)', color: '#0d0d0d' }}>
-                📢 Generar Primera Pauta
-              </button>
-            </div>
-          )}
-          {ads.map(ad => {
-            const isExpanded = expandedAdId === ad.id
-            const isCopied = copiedId === ad.id + '_prompt'
-            return (
-              <div key={ad.id} style={{ borderRadius: '16px', backgroundColor: '#161616', border: `1px solid ${isExpanded ? '#fbbf2444' : '#1f1f1f'}`, overflow: 'hidden' }}>
-                <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div>
-                      <span style={{ padding: '3px 10px', borderRadius: '999px', fontSize: '11px', fontWeight: 700, backgroundColor: '#fbbf240d', color: '#fbbf24', border: '1px solid #fbbf2422' }}>📢 Pauta Meta Ads</span>
-                      <p style={{ margin: '8px 0 4px', fontSize: '15px', fontWeight: 800, color: '#f0f0f0' }}>{ad.headline}</p>
-                      <p style={{ margin: 0, fontSize: '12px', color: '#6b7280' }}>{ad.objetivo.split('—')[0].trim()}</p>
-                    </div>
-                    <button onClick={() => deleteAd(ad.id)} style={{ padding: '4px 8px', borderRadius: '6px', fontSize: '10px', cursor: 'pointer', backgroundColor: 'transparent', border: '1px solid #2a2a2a', color: '#4b5563' }}>✕</button>
+          <div style={{ borderRadius: '16px', backgroundColor: '#161616', border: '1px solid #1f1f1f', padding: '16px' }}>
+            <p style={{ margin: 0, fontSize: '13px', color: '#6b7280', lineHeight: '1.6' }}>
+              📅 <strong style={{ color: '#f0f0f0' }}>2 publicaciones diarias</strong> — 🌅 12:00 PM y 🌙 7:00 PM — máximo engagement en Colombia.
+            </p>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {HORARIO.map((fila, i) => (
+              <div key={i} style={{ borderRadius: '14px', backgroundColor: '#161616', border: '1px solid #1f1f1f', padding: '14px 16px', display: 'flex', gap: '12px', alignItems: 'flex-start', flexWrap: isMobile ? 'wrap' : 'nowrap' }}>
+                <div style={{ minWidth: '90px', fontWeight: 700, fontSize: '13px', color: '#00cfff', paddingTop: '2px' }}>{fila.dia}</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '7px', flex: 1 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '11px', fontWeight: 600, color: '#6b7280', minWidth: '58px' }}>🌅 12:00 PM</span>
+                    <span style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 600, backgroundColor: '#00cfff0d', border: '1px solid #00cfff22', color: '#00cfff' }}>{fila.am}</span>
                   </div>
-                  <button onClick={() => setExpandedAdId(isExpanded ? null : ad.id)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '8px', borderRadius: '9px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', backgroundColor: isExpanded ? '#fbbf240d' : '#0d0d0d', border: `1px solid ${isExpanded ? '#fbbf2422' : '#2a2a2a'}`, color: isExpanded ? '#fbbf24' : '#6b7280' }}>
-                    {isExpanded ? <><ChevronUp size={13} /> Cerrar pauta</> : <><ChevronDown size={13} /> Ver pauta completa</>}
-                  </button>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '11px', fontWeight: 600, color: '#6b7280', minWidth: '58px' }}>🌙 7:00 PM</span>
+                    <span style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 600, backgroundColor: '#00ff940d', border: '1px solid #00ff9422', color: '#00ff94' }}>{fila.pm}</span>
+                  </div>
                 </div>
-                {isExpanded && (
-                  <div style={{ borderTop: '1px solid #fbbf2422', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    <div style={{ borderRadius: '12px', backgroundColor: '#0d0d0d', padding: '14px', border: '1px solid #2a2a2a' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}><Target size={13} style={{ color: '#fbbf24' }} /><p style={{ margin: 0, fontSize: '11px', fontWeight: 700, color: '#fbbf24', textTransform: 'uppercase' }}>Objetivo</p></div>
-                      <p style={{ margin: 0, fontSize: '13px', color: '#e5e7eb', lineHeight: '1.6' }}>{ad.objetivo}</p>
-                    </div>
-                    <div style={{ borderRadius: '12px', backgroundColor: '#0d0d0d', padding: '14px', border: '1px solid #2a2a2a' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}><Users size={13} style={{ color: '#00cfff' }} /><p style={{ margin: 0, fontSize: '11px', fontWeight: 700, color: '#00cfff', textTransform: 'uppercase' }}>Público objetivo</p></div>
-                      <p style={{ margin: 0, fontSize: '13px', color: '#e5e7eb', lineHeight: '1.6' }}>{ad.publico_objetivo}</p>
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '12px' }}>
-                      <div style={{ borderRadius: '12px', backgroundColor: '#0d0d0d', padding: '14px', border: '1px solid #2a2a2a' }}>
-                        <p style={{ margin: '0 0 6px', fontSize: '11px', fontWeight: 700, color: '#a78bfa', textTransform: 'uppercase' }}>🖼️ Formato</p>
-                        <p style={{ margin: 0, fontSize: '13px', color: '#e5e7eb' }}>{ad.formato}</p>
-                      </div>
-                      <div style={{ borderRadius: '12px', backgroundColor: '#0d0d0d', padding: '14px', border: '1px solid #2a2a2a' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}><DollarSign size={13} style={{ color: '#00ff94' }} /><p style={{ margin: 0, fontSize: '11px', fontWeight: 700, color: '#00ff94', textTransform: 'uppercase' }}>Presupuesto</p></div>
-                        <p style={{ margin: 0, fontSize: '12px', color: '#e5e7eb', lineHeight: '1.6' }}>{ad.presupuesto_sugerido}</p>
-                      </div>
-                    </div>
-                    <div style={{ borderRadius: '12px', backgroundColor: '#0d0d0d', padding: '14px', border: '1px solid #fbbf2422' }}>
-                      <p style={{ margin: '0 0 10px', fontSize: '11px', fontWeight: 700, color: '#fbbf24', textTransform: 'uppercase' }}>📝 Copy del anuncio</p>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        <div><span style={{ fontSize: '11px', color: '#6b7280' }}>HEADLINE: </span><span style={{ fontSize: '13px', fontWeight: 700, color: '#f0f0f0' }}>{ad.headline}</span></div>
-                        <div><span style={{ fontSize: '11px', color: '#6b7280' }}>TEXTO: </span><span style={{ fontSize: '13px', color: '#e5e7eb' }}>{ad.descripcion}</span></div>
-                        <div><span style={{ fontSize: '11px', color: '#6b7280' }}>CTA: </span><span style={{ fontSize: '13px', fontWeight: 700, color: '#fbbf24' }}>{ad.cta}</span></div>
-                      </div>
-                    </div>
-                    <div style={{ borderRadius: '12px', backgroundColor: '#0d0d0d', padding: '14px', border: '1px solid #2a2a2a' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}><BarChart2 size={13} style={{ color: '#f472b6' }} /><p style={{ margin: 0, fontSize: '11px', fontWeight: 700, color: '#f472b6', textTransform: 'uppercase' }}>Métricas esperadas</p></div>
-                      <p style={{ margin: 0, fontSize: '13px', color: '#e5e7eb', lineHeight: '1.7' }}>{ad.metricas_esperadas}</p>
-                    </div>
-                    <div style={{ borderRadius: '12px', backgroundColor: '#0d0d0d', padding: '14px', border: '1px solid #2a2a2a' }}>
-                      <p style={{ margin: '0 0 8px', fontSize: '11px', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase' }}>🖼️ Qué plasmar en la imagen</p>
-                      <p style={{ margin: 0, fontSize: '13px', color: '#e5e7eb', lineHeight: '1.7' }}>{ad.image_description}</p>
-                    </div>
-                    <div style={{ borderRadius: '12px', backgroundColor: '#0d0d0d', padding: '14px', border: '1px solid #fbbf2422' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                        <p style={{ margin: 0, fontSize: '11px', fontWeight: 700, color: '#fbbf24', textTransform: 'uppercase' }}>✨ Prompt para ChatGPT</p>
-                        <button onClick={() => copyText(ad.prompt_chatgpt, ad.id + '_prompt')} style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '5px 10px', borderRadius: '7px', fontSize: '11px', fontWeight: 700, cursor: 'pointer', backgroundColor: isCopied ? '#00ff940d' : '#fbbf240d', border: `1px solid ${isCopied ? '#00ff9433' : '#fbbf2422'}`, color: isCopied ? '#00ff94' : '#fbbf24' }}>
-                          {isCopied ? <><Check size={11} /> Copiado</> : <><Copy size={11} /> Copiar</>}
-                        </button>
-                      </div>
-                      <p style={{ margin: 0, fontSize: '12px', color: '#d1d5db', lineHeight: '1.8', fontFamily: 'monospace' }}>{ad.prompt_chatgpt}</p>
-                    </div>
-                  </div>
-                )}
               </div>
-            )
-          })}
+            ))}
+          </div>
+
+          <div style={{ borderRadius: '14px', backgroundColor: '#161616', border: '1px solid #fbbf2422', padding: '14px 16px' }}>
+            <p style={{ margin: 0, fontSize: '12px', fontWeight: 700, color: '#fbbf24', marginBottom: '8px' }}>💡 Estrategia de rotación</p>
+            <p style={{ margin: 0, fontSize: '12px', color: '#9ca3af', lineHeight: '1.7' }}>
+              Semana 1: publica con el horario de arriba.<br />
+              Semana 2: intercambia los horarios (12PM ↔ 7PM) para alcanzar audiencias distintas.<br />
+              Semana 3+: varía el caption y rota el orden de los carruseles.
+            </p>
+          </div>
         </>
       )}
     </div>
