@@ -1,8 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useIsMobile } from '@/lib/hooks'
-import { Copy, Check, ChevronDown, ChevronUp, Calendar, Layers, Image as ImageIcon, BookOpen } from 'lucide-react'
+import { Copy, Check, ChevronDown, ChevronUp, Calendar, Layers, Image as ImageIcon, BookOpen, ChevronLeft, ChevronRight } from 'lucide-react'
 
 interface Slide {
   numero: number
@@ -394,15 +394,44 @@ Un equipo con Taply no reparte papeles — deja huella digital. 🤝
   }
 ]
 
-const HORARIO = [
-  { dia: 'Lunes',     am: 'C1 — Hook Papel', pm: 'C2 — Negocio Físico' },
-  { dia: 'Martes',    am: 'C3 — Testimonio Bella Pieza', pm: 'C4 — Matemática del precio' },
-  { dia: 'Miércoles', am: 'C5 — Cómo conseguir tu Taply', pm: 'C5 — Cómo conseguir tu Taply' },
-  { dia: 'Jueves',    am: 'C6 — 5 negocios que lo necesitan', pm: 'C7 — Paquetes empresariales' },
-  { dia: 'Viernes',   am: 'C2 — Negocio Físico', pm: 'C4 — Matemática del precio' },
-  { dia: 'Sábado',    am: 'C3 — Testimonio Bella Pieza', pm: 'C5 — Cómo conseguir tu Taply' },
-  { dia: 'Domingo',   am: 'C6 — 5 negocios que lo necesitan', pm: 'C7 — Paquetes empresariales' },
+const DIAS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
+
+// 7 patrones semanales distintos — rotan infinitamente por número de semana del año
+// Cada entrada: [índice carrusel AM, índice carrusel PM] (0-based, C1=0 … C7=6)
+const PATRONES_SEMANALES: Array<[number, number][]> = [
+  // Semana A
+  [[0,1],[2,3],[4,4],[5,6],[1,3],[2,4],[5,6]],
+  // Semana B — invertida mañana/tarde
+  [[1,0],[3,2],[4,4],[6,5],[3,1],[4,2],[6,5]],
+  // Semana C — enfoque ventas directas primero
+  [[3,0],[1,2],[5,4],[0,6],[4,3],[2,5],[6,1]],
+  // Semana D — testimonio arranca la semana
+  [[2,0],[4,1],[3,5],[6,0],[2,4],[1,3],[5,6]],
+  // Semana E — paquetes empresariales destacados
+  [[6,0],[5,2],[1,3],[4,2],[0,6],[3,5],[2,4]],
+  // Semana F — nicho + proceso
+  [[5,1],[0,4],[2,6],[3,1],[5,0],[4,2],[6,3]],
+  // Semana G — mix completo
+  [[4,2],[6,0],[1,5],[2,4],[3,6],[0,1],[5,3]],
 ]
+
+function getWeekNumber(date: Date): number {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
+  const dayNum = d.getUTCDay() || 7
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum)
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1))
+  return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7)
+}
+
+function getWeekStart(weekOffset: number): Date {
+  const now = new Date()
+  const day = now.getDay()
+  const diffToMonday = (day === 0 ? -6 : 1 - day)
+  const monday = new Date(now)
+  monday.setDate(now.getDate() + diffToMonday + weekOffset * 7)
+  monday.setHours(0, 0, 0, 0)
+  return monday
+}
 
 export default function ContenidoPage() {
   const isMobile = useIsMobile()
@@ -410,6 +439,36 @@ export default function ContenidoPage() {
   const [activeCarrusel, setActiveCarrusel] = useState(0)
   const [expandedSlide, setExpandedSlide] = useState<string | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [weekOffset, setWeekOffset] = useState(0)
+
+  const semanaActual = useMemo(() => {
+    const weekStart = getWeekStart(weekOffset)
+    const weekNum = getWeekNumber(weekStart)
+    const patronIdx = (weekNum - 1) % PATRONES_SEMANALES.length
+    const patron = PATRONES_SEMANALES[patronIdx]
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    return DIAS.map((dia, i) => {
+      const fecha = new Date(weekStart)
+      fecha.setDate(weekStart.getDate() + i)
+      const [amIdx, pmIdx] = patron[i]
+      const esHoy = weekOffset === 0 && fecha.getTime() === today.getTime()
+      return {
+        dia,
+        fecha,
+        amIdx,
+        pmIdx,
+        am: CARRUSELES[amIdx],
+        pm: CARRUSELES[pmIdx],
+        esHoy,
+      }
+    })
+  }, [weekOffset])
+
+  const weekStart = getWeekStart(weekOffset)
+  const weekNum = getWeekNumber(weekStart)
+  const patronLetra = String.fromCharCode(65 + ((weekNum - 1) % PATRONES_SEMANALES.length))
 
   function copiar(texto: string, id: string) {
     navigator.clipboard.writeText(texto)
@@ -539,36 +598,68 @@ export default function ContenidoPage() {
 
       {activeTab === 'calendario' && (
         <>
-          <div style={{ borderRadius: '16px', backgroundColor: '#161616', border: '1px solid #1f1f1f', padding: '16px' }}>
-            <p style={{ margin: 0, fontSize: '13px', color: '#6b7280', lineHeight: '1.6' }}>
-              📅 <strong style={{ color: '#f0f0f0' }}>2 publicaciones diarias</strong> — 🌅 12:00 PM y 🌙 7:00 PM — máximo engagement en Colombia.
-            </p>
+          {/* Navegador de semana */}
+          <div style={{ borderRadius: '16px', backgroundColor: '#161616', border: '1px solid #00cfff22', padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+            <button onClick={() => setWeekOffset(w => w - 1)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '34px', height: '34px', borderRadius: '10px', border: '1px solid #2a2a2a', backgroundColor: '#0d0d0d', cursor: 'pointer', color: '#9ca3af' }}>
+              <ChevronLeft size={16} />
+            </button>
+            <div style={{ textAlign: 'center', flex: 1 }}>
+              <div style={{ fontSize: '13px', fontWeight: 800, color: '#f0f0f0' }}>
+                {weekOffset === 0 ? '📅 Esta semana' : weekOffset === 1 ? '📅 Próxima semana' : weekOffset === -1 ? '📅 Semana pasada' : `📅 Semana ${weekOffset > 0 ? `+${weekOffset}` : weekOffset}`}
+              </div>
+              <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '2px' }}>
+                Semana {weekNum} · Patrón {patronLetra} · {weekStart.toLocaleDateString('es-CO', { day: 'numeric', month: 'short' })} – {new Date(weekStart.getTime() + 6 * 86400000).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' })}
+              </div>
+            </div>
+            <button onClick={() => setWeekOffset(w => w + 1)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '34px', height: '34px', borderRadius: '10px', border: '1px solid #2a2a2a', backgroundColor: '#0d0d0d', cursor: 'pointer', color: '#9ca3af' }}>
+              <ChevronRight size={16} />
+            </button>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            {HORARIO.map((fila, i) => (
-              <div key={i} style={{ borderRadius: '14px', backgroundColor: '#161616', border: '1px solid #1f1f1f', padding: '14px 16px', display: 'flex', gap: '12px', alignItems: 'flex-start', flexWrap: isMobile ? 'wrap' : 'nowrap' }}>
-                <div style={{ minWidth: '90px', fontWeight: 700, fontSize: '13px', color: '#00cfff', paddingTop: '2px' }}>{fila.dia}</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '7px', flex: 1 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ fontSize: '11px', fontWeight: 600, color: '#6b7280', minWidth: '58px' }}>🌅 12:00 PM</span>
-                    <span style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 600, backgroundColor: '#00cfff0d', border: '1px solid #00cfff22', color: '#00cfff' }}>{fila.am}</span>
+          {weekOffset !== 0 && (
+            <button onClick={() => setWeekOffset(0)} style={{ alignSelf: 'center', padding: '6px 16px', borderRadius: '20px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', border: '1px solid #00cfff33', backgroundColor: '#00cfff0d', color: '#00cfff' }}>
+              Volver a esta semana
+            </button>
+          )}
+
+          {/* Días de la semana */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {semanaActual.map((fila, i) => (
+              <div key={i} style={{ borderRadius: '14px', backgroundColor: '#161616', border: `1px solid ${fila.esHoy ? '#00cfff44' : '#1f1f1f'}`, padding: '12px 14px', display: 'flex', gap: '10px', alignItems: 'flex-start', flexWrap: isMobile ? 'wrap' : 'nowrap', position: 'relative', overflow: 'hidden' }}>
+                {fila.esHoy && <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: 'linear-gradient(90deg,#00cfff,#00ff94)' }} />}
+                <div style={{ minWidth: '80px', paddingTop: '2px' }}>
+                  <div style={{ fontWeight: 700, fontSize: '13px', color: fila.esHoy ? '#00cfff' : '#e5e7eb' }}>{fila.dia}</div>
+                  <div style={{ fontSize: '10px', color: '#4b5563', marginTop: '1px' }}>
+                    {fila.fecha.toLocaleDateString('es-CO', { day: 'numeric', month: 'short' })}
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ fontSize: '11px', fontWeight: 600, color: '#6b7280', minWidth: '58px' }}>🌙 7:00 PM</span>
-                    <span style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 600, backgroundColor: '#00ff940d', border: '1px solid #00ff9422', color: '#00ff94' }}>{fila.pm}</span>
-                  </div>
+                  {fila.esHoy && <div style={{ fontSize: '9px', fontWeight: 700, color: '#00cfff', marginTop: '3px', letterSpacing: '0.05em' }}>HOY</div>}
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flex: 1 }}>
+                  <button
+                    onClick={() => { setActiveCarrusel(fila.amIdx); setActiveTab('carruseles'); setExpandedSlide(null) }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 10px', borderRadius: '10px', backgroundColor: '#00cfff08', border: '1px solid #00cfff1a', cursor: 'pointer', textAlign: 'left', width: '100%' }}
+                  >
+                    <span style={{ fontSize: '10px', fontWeight: 600, color: '#6b7280', minWidth: '52px', flexShrink: 0 }}>🌅 12 PM</span>
+                    <span style={{ padding: '2px 8px', borderRadius: '12px', fontSize: '10px', fontWeight: 800, background: 'linear-gradient(90deg,#00cfff,#00ff94)', color: '#0d0d0d', flexShrink: 0 }}>{fila.am.codigo}</span>
+                    <span style={{ fontSize: '11px', color: '#9ca3af', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{fila.am.titulo}</span>
+                  </button>
+                  <button
+                    onClick={() => { setActiveCarrusel(fila.pmIdx); setActiveTab('carruseles'); setExpandedSlide(null) }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 10px', borderRadius: '10px', backgroundColor: '#00ff9408', border: '1px solid #00ff941a', cursor: 'pointer', textAlign: 'left', width: '100%' }}
+                  >
+                    <span style={{ fontSize: '10px', fontWeight: 600, color: '#6b7280', minWidth: '52px', flexShrink: 0 }}>🌙 7 PM</span>
+                    <span style={{ padding: '2px 8px', borderRadius: '12px', fontSize: '10px', fontWeight: 800, background: 'linear-gradient(90deg,#00ff94,#00cfff)', color: '#0d0d0d', flexShrink: 0 }}>{fila.pm.codigo}</span>
+                    <span style={{ fontSize: '11px', color: '#9ca3af', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{fila.pm.titulo}</span>
+                  </button>
                 </div>
               </div>
             ))}
           </div>
 
           <div style={{ borderRadius: '14px', backgroundColor: '#161616', border: '1px solid #fbbf2422', padding: '14px 16px' }}>
-            <p style={{ margin: 0, fontSize: '12px', fontWeight: 700, color: '#fbbf24', marginBottom: '8px' }}>💡 Estrategia de rotación</p>
+            <p style={{ margin: 0, fontSize: '12px', fontWeight: 700, color: '#fbbf24', marginBottom: '6px' }}>♾️ Rotación automática infinita</p>
             <p style={{ margin: 0, fontSize: '12px', color: '#9ca3af', lineHeight: '1.7' }}>
-              Semana 1: publica con el horario de arriba.<br />
-              Semana 2: intercambia los horarios (12PM ↔ 7PM) para alcanzar audiencias distintas.<br />
-              Semana 3+: varía el caption y rota el orden de los carruseles.
+              7 patrones distintos (A–G) rotan cada semana automáticamente según el número de semana del año. Nunca se repite el mismo orden. Tocá cualquier carrusel del calendario para ver sus prompts al instante.
             </p>
           </div>
         </>
