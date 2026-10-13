@@ -125,8 +125,8 @@ export default async function ProfilePage({params}:{params:Promise<{slug:string}
   ].filter(Boolean) as {url:string;label:string;type:string}[]
   return(
     <div style={{minHeight:'100vh',background:theme.bg,fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif'}}>
-      <div style={{background:theme.heroBg,paddingBottom:'60px',position:'relative'}}>
-        <div style={{height:'120px'}}/>
+      <div style={{background:theme.heroBg,paddingBottom:'50px',position:'relative'}}>
+          <div style={{height:'50px'}}/>
         <div style={{display:'flex',flexDirection:'column',alignItems:'center',padding:'0 20px'}}>
           {profile.avatar_url?(
             <img src={profile.avatar_url} alt={profile.display_name} style={{width:'110px',height:'110px',borderRadius:'50%',objectFit:'cover',border:`3px solid ${theme.avatarBorder}`,boxShadow:`0 0 20px ${theme.avatarBorder}`}}/>
@@ -139,7 +139,7 @@ export default async function ProfilePage({params}:{params:Promise<{slug:string}
           {profile.company&&<p style={{margin:'4px 0 0',fontSize:'13px',color:subColor}}>{profile.company}</p>}
         </div>
       </div>
-      <div style={{maxWidth:'420px',margin:'-30px auto 0',padding:'0 16px 40px'}}>
+      <div style={{maxWidth:'420px',margin:'-20px auto 0',padding:'0 16px 40px',position:'relative',zIndex:1}}>
         {allLinks.length>0&&(
           <div style={{background:theme.cardBg,borderRadius:theme.radius,border:`1px solid ${theme.cardBorder}`,padding:'8px',display:'flex',flexDirection:'column',gap:'6px',marginBottom:'16px'}}>
             {allLinks.map((link,i)=>(
