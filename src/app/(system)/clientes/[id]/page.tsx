@@ -16,17 +16,60 @@ interface NFCProfile {
   company: string | null; avatar_url: string | null; whatsapp: string | null
   email: string | null; website: string | null; instagram: string | null
   tiktok: string | null; linkedin: string | null; facebook: string | null
-  youtube: string | null; custom_links: CustomLink[]; is_active: boolean; views: number
-  template: string
+  youtube: string | null; custom_links: CustomLink[]; is_active: boolean
+  views: number; template: string | null
 }
 
-const TEMPLATES = [
-  { id: 'default',     name: 'Oscuro',      emoji: '🌑', accent: '#00cfff', bg: '#0a0a0a', grad: 'linear-gradient(135deg,#00cfff,#00ff94)' },
-  { id: 'restaurante', name: 'Restaurante', emoji: '🍽️', accent: '#ff6b35', bg: '#1a0800', grad: 'linear-gradient(135deg,#ff6b35,#ffb347)' },
-  { id: 'barberia',    name: 'Barbería',    emoji: '✂️',  accent: '#ffd700', bg: '#0a0800', grad: 'linear-gradient(135deg,#ffd700,#ff8c00)' },
-  { id: 'tienda',      name: 'Tienda',      emoji: '🛍️', accent: '#a855f7', bg: '#0d0a1a', grad: 'linear-gradient(135deg,#a855f7,#ec4899)' },
-  { id: 'creativo',    name: 'Creativo',    emoji: '🎨',  accent: '#ff6ec7', bg: '#0a000f', grad: 'linear-gradient(135deg,#ff6ec7,#ff9a3c)' },
-  { id: 'profesional', name: 'Profesional', emoji: '💼',  accent: '#3b82f6', bg: '#00061a', grad: 'linear-gradient(135deg,#3b82f6,#06b6d4)' },
+const TEMPLATE_PREVIEWS = [
+  {
+    id: 'default',
+    name: 'Dark NFC',
+    bg: 'linear-gradient(145deg, #111111 0%, #0a0a0a 100%)',
+    nameGrad: 'linear-gradient(90deg, #00cfff, #00ff94)',
+    dot1: '#00cfff',
+    dot2: '#00ff94',
+  },
+  {
+    id: 'ocean',
+    name: 'Deep Ocean',
+    bg: 'linear-gradient(145deg, #001a3a 0%, #00091a 100%)',
+    nameGrad: 'linear-gradient(90deg, #60efff, #0096ff)',
+    dot1: '#60efff',
+    dot2: '#0096ff',
+  },
+  {
+    id: 'gold',
+    name: 'Gold Premium',
+    bg: 'linear-gradient(145deg, #1a1200 0%, #0d0900 100%)',
+    nameGrad: 'linear-gradient(90deg, #d4af37, #ffd700)',
+    dot1: '#d4af37',
+    dot2: '#ffd700',
+  },
+  {
+    id: 'aurora',
+    name: 'Aurora',
+    bg: 'linear-gradient(145deg, #0a0020 0%, #001a10 100%)',
+    nameGrad: 'linear-gradient(90deg, #00ff94, #a855f7)',
+    dot1: '#00ff94',
+    dot2: '#a855f7',
+  },
+  {
+    id: 'sunset',
+    name: 'Sunset',
+    bg: 'linear-gradient(145deg, #1f0a00 0%, #180010 100%)',
+    nameGrad: 'linear-gradient(90deg, #ff6b35, #f7931a)',
+    dot1: '#ff6b35',
+    dot2: '#f7931a',
+  },
+  {
+    id: 'minimal',
+    name: 'Minimal',
+    bg: 'linear-gradient(145deg, #ffffff 0%, #f2f2f2 100%)',
+    nameGrad: null,
+    nameSolid: '#0d0d0d',
+    dot1: '#9ca3af',
+    dot2: '#d1d5db',
+  },
 ]
 
 export default function ClienteDetallePage() {
@@ -82,11 +125,7 @@ export default function ClienteDetallePage() {
       setPreviewAvatar(nfcRes.data.avatar_url ?? null)
     }
     if (clientRes.data) {
-      setEditForm({
-        full_name: clientRes.data.full_name ?? '', email: clientRes.data.email ?? '',
-        phone: clientRes.data.phone ?? '', company: clientRes.data.company ?? '',
-        city: clientRes.data.city ?? '', notes: clientRes.data.notes ?? '',
-      })
+      setEditForm({ full_name: clientRes.data.full_name ?? '', email: clientRes.data.email ?? '', phone: clientRes.data.phone ?? '', company: clientRes.data.company ?? '', city: clientRes.data.city ?? '', notes: clientRes.data.notes ?? '' })
     }
     setLoading(false)
   }
@@ -112,11 +151,7 @@ export default function ClienteDetallePage() {
   async function handleSaveEdit() {
     if (!editForm.full_name.trim()) { setMessage({ type: 'error', text: 'El nombre es obligatorio.' }); return }
     setSaving(true); setMessage(null)
-    const { error } = await supabase.from('clients').update({
-      full_name: editForm.full_name.trim(), email: editForm.email.trim() || null,
-      phone: editForm.phone.trim() || null, company: editForm.company.trim() || null,
-      city: editForm.city.trim() || null, notes: editForm.notes.trim() || null,
-    }).eq('id', id)
+    const { error } = await supabase.from('clients').update({ full_name: editForm.full_name.trim(), email: editForm.email.trim() || null, phone: editForm.phone.trim() || null, company: editForm.company.trim() || null, city: editForm.city.trim() || null, notes: editForm.notes.trim() || null }).eq('id', id)
     if (error) { setMessage({ type: 'error', text: 'Error al guardar.' }) }
     else { setMessage({ type: 'success', text: 'Cliente actualizado.' }); setEditing(false); fetchData() }
     setSaving(false)
@@ -131,8 +166,7 @@ export default function ClienteDetallePage() {
   }
 
   function generateSlug(name: string): string {
-    return name.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
-      .replace(/[^a-z0-9\s-]/g, '').trim().replace(/\s+/g, '-').replace(/-+/g, '-')
+    return name.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9\s-]/g, '').trim().replace(/\s+/g, '-').replace(/-+/g, '-')
   }
 
   async function handleSaveNFC() {
@@ -159,7 +193,7 @@ export default function ClienteDetallePage() {
       error = res.error
     }
     if (error) { setNfcMessage({ type: 'error', text: `Error: ${error.message}` }) }
-    else { setNfcMessage({ type: 'success', text: '✅ Perfil NFC guardado.' }); setShowNFCForm(false); fetchData() }
+    else { setNfcMessage({ type: 'success', text: '✅ Perfil NFC guardado correctamente.' }); setShowNFCForm(false); fetchData() }
     setSavingNFC(false)
   }
 
@@ -179,7 +213,6 @@ export default function ClienteDetallePage() {
   const pendingCount = sales.filter(s => s.status === 'pendiente').length
   const pendingRevenue = sales.filter(s => s.status === 'pendiente').reduce((acc, s) => acc + Number(s.total_revenue), 0)
   const profileUrl = nfcProfile ? `https://taply-inventory.vercel.app/p/${nfcProfile.slug}` : null
-  const activeTemplate = TEMPLATES.find(t => t.id === nfcForm.template) ?? TEMPLATES[0]
 
   if (loading) return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -236,18 +269,10 @@ export default function ClienteDetallePage() {
         <div style={{ borderRadius: '14px', padding: '20px', backgroundColor: '#161616', border: '1px solid #00cfff22', display: 'flex', flexDirection: 'column', gap: '12px' }}>
           <h2 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: '#00cfff' }}>✏️ Editar cliente</h2>
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '10px' }}>
-            {[
-              { key: 'full_name', label: 'Nombre *', placeholder: 'Nombre completo' },
-              { key: 'company', label: 'Empresa', placeholder: 'Empresa' },
-              { key: 'email', label: 'Email', placeholder: 'correo@email.com' },
-              { key: 'phone', label: 'Teléfono', placeholder: '3001234567' },
-              { key: 'city', label: 'Ciudad', placeholder: 'Ciudad' },
-              { key: 'notes', label: 'Notas', placeholder: 'Observaciones' },
-            ].map(({ key, label, placeholder }) => (
+            {[{ key: 'full_name', label: 'Nombre *', placeholder: 'Nombre completo' }, { key: 'company', label: 'Empresa', placeholder: 'Empresa' }, { key: 'email', label: 'Email', placeholder: 'correo@email.com' }, { key: 'phone', label: 'Teléfono', placeholder: '3001234567' }, { key: 'city', label: 'Ciudad', placeholder: 'Ciudad' }, { key: 'notes', label: 'Notas', placeholder: 'Observaciones' }].map(({ key, label, placeholder }) => (
               <div key={key}>
                 <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#9ca3af', marginBottom: '5px' }}>{label}</label>
-                <input type="text" value={editForm[key as keyof typeof editForm]}
-                  onChange={e => setEditForm(p => ({ ...p, [key]: e.target.value }))} placeholder={placeholder}
+                <input type="text" value={editForm[key as keyof typeof editForm]} onChange={e => setEditForm(p => ({ ...p, [key]: e.target.value }))} placeholder={placeholder}
                   style={{ width: '100%', padding: '9px 12px', borderRadius: '9px', fontSize: '13px', outline: 'none', backgroundColor: '#0d0d0d', border: '1px solid #2a2a2a', color: '#f0f0f0', boxSizing: 'border-box' }} />
               </div>
             ))}
@@ -271,12 +296,10 @@ export default function ClienteDetallePage() {
                 <p style={{ margin: '3px 0 0', fontSize: '13px', color: '#f0f0f0' }}>{value}</p>
               </div>
             ))}
-            {client.notes && (
-              <div style={{ gridColumn: isMobile ? 'span 2' : 'span 3' }}>
-                <p style={{ margin: 0, fontSize: '10px', color: '#6b7280', fontWeight: 600, textTransform: 'uppercase' }}>Notas</p>
-                <p style={{ margin: '3px 0 0', fontSize: '13px', color: '#9ca3af' }}>{client.notes}</p>
-              </div>
-            )}
+            {client.notes && <div style={{ gridColumn: isMobile ? 'span 2' : 'span 3' }}>
+              <p style={{ margin: 0, fontSize: '10px', color: '#6b7280', fontWeight: 600, textTransform: 'uppercase' }}>Notas</p>
+              <p style={{ margin: '3px 0 0', fontSize: '13px', color: '#9ca3af' }}>{client.notes}</p>
+            </div>}
           </div>
         </div>
       )}
@@ -297,13 +320,10 @@ export default function ClienteDetallePage() {
         ))}
       </div>
 
-      {/* Desglose productos */}
+      {/* Desglose */}
       {completedSales.length > 0 && (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-          {[
-            { label: 'Taply Essential', count: essentialCount, color: '#00cfff', bg: '#00cfff0d', border: '#00cfff22' },
-            { label: 'Taply Custom', count: customCount, color: '#00ff94', bg: '#00ff940d', border: '#00ff9422' },
-          ].map(({ label, count, color, bg, border }) => (
+          {[{ label: 'Taply Essential', count: essentialCount, color: '#00cfff', bg: '#00cfff0d', border: '#00cfff22' }, { label: 'Taply Custom', count: customCount, color: '#00ff94', bg: '#00ff940d', border: '#00ff9422' }].map(({ label, count, color, bg, border }) => (
             <div key={label} style={{ borderRadius: '12px', padding: '14px 16px', backgroundColor: bg, border: `1px solid ${border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <span style={{ fontSize: '13px', fontWeight: 600, color: '#f0f0f0' }}>{label}</span>
               <span style={{ fontSize: '24px', fontWeight: 900, color }}>{count}</span>
@@ -314,8 +334,6 @@ export default function ClienteDetallePage() {
 
       {/* ⚡ PERFIL NFC */}
       <div style={{ borderRadius: '16px', overflow: 'hidden', border: nfcProfile ? '1px solid #00cfff22' : '1px dashed #2a2a2a' }}>
-
-        {/* Header sección NFC */}
         <div style={{ padding: '18px 20px', backgroundColor: nfcProfile ? '#00cfff0d' : '#161616', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             {nfcProfile?.avatar_url ? (
@@ -350,44 +368,10 @@ export default function ClienteDetallePage() {
           </div>
         </div>
 
-        {/* Formulario NFC */}
         {showNFCForm && (
           <div style={{ padding: '20px', backgroundColor: '#0d0d0d', borderTop: '1px solid #1f1f1f', display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
-            {/* ── SELECTOR DE PLANTILLA ── */}
-            <div style={{ borderRadius: '12px', padding: '16px', backgroundColor: '#161616', border: `1px solid ${activeTemplate.accent}33` }}>
-              <p style={{ margin: '0 0 12px', fontSize: '12px', fontWeight: 700, color: '#9ca3af' }}>🎨 Plantilla del perfil</p>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
-                {TEMPLATES.map(t => {
-                  const selected = nfcForm.template === t.id
-                  return (
-                    <button key={t.id} onClick={() => setNfcForm(p => ({ ...p, template: t.id }))}
-                      style={{
-                        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px',
-                        padding: '12px 8px', borderRadius: '10px', cursor: 'pointer',
-                        backgroundColor: selected ? t.accent + '18' : '#0d0d0d',
-                        border: selected ? `2px solid ${t.accent}` : '2px solid #2a2a2a',
-                        transition: 'all 0.15s ease',
-                      }}>
-                      {/* Mini preview del tema */}
-                      <div style={{ width: '100%', height: '36px', borderRadius: '6px', background: t.bg, border: `1px solid ${t.accent}44`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '3px', overflow: 'hidden', padding: '4px', boxSizing: 'border-box' }}>
-                        <div style={{ width: '60%', height: '5px', borderRadius: '999px', background: t.grad }} />
-                        <div style={{ width: '80%', height: '4px', borderRadius: '999px', background: t.accent + '55' }} />
-                        <div style={{ width: '80%', height: '4px', borderRadius: '999px', background: t.accent + '33' }} />
-                      </div>
-                      <span style={{ fontSize: '10px', fontWeight: selected ? 700 : 500, color: selected ? t.accent : '#6b7280', textAlign: 'center', lineHeight: '1.2' }}>
-                        {t.emoji} {t.name}
-                      </span>
-                    </button>
-                  )
-                })}
-              </div>
-              <p style={{ margin: '10px 0 0', fontSize: '11px', color: '#4b5563' }}>
-                Seleccionada: <span style={{ color: activeTemplate.accent, fontWeight: 700 }}>{activeTemplate.emoji} {activeTemplate.name}</span>
-              </p>
-            </div>
-
-            {/* Upload imagen */}
+            {/* Upload de imagen */}
             <div style={{ borderRadius: '12px', padding: '16px', backgroundColor: '#161616', border: '1px solid #1f1f1f' }}>
               <p style={{ margin: '0 0 12px', fontSize: '12px', fontWeight: 700, color: '#9ca3af' }}>📸 Logo o foto del perfil</p>
               <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
@@ -402,7 +386,8 @@ export default function ClienteDetallePage() {
                   <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageUpload} style={{ display: 'none' }} />
                   <button onClick={() => fileInputRef.current?.click()} disabled={uploadingImage}
                     style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: uploadingImage ? 'not-allowed' : 'pointer', backgroundColor: '#00cfff0d', border: '1px solid #00cfff33', color: '#00cfff' }}>
-                    <Upload size={14} /> {uploadingImage ? 'Subiendo...' : previewAvatar ? 'Cambiar imagen' : 'Subir imagen'}
+                    <Upload size={14} />
+                    {uploadingImage ? 'Subiendo...' : previewAvatar ? 'Cambiar imagen' : 'Subir imagen'}
                   </button>
                   <p style={{ margin: 0, fontSize: '11px', color: '#4b5563' }}>PNG, JPG o WebP · Máx. 2MB · Se recomienda cuadrada</p>
                   {previewAvatar && (
@@ -415,15 +400,10 @@ export default function ClienteDetallePage() {
               </div>
             </div>
 
-            {/* Datos básicos */}
             <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '12px' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#9ca3af', marginBottom: '6px' }}>Nombre en el perfil *</label>
-                <input type="text" value={nfcForm.display_name}
-                  onChange={e => {
-                    const val = e.target.value
-                    setNfcForm(p => ({ ...p, display_name: val, ...(!nfcProfile && { slug: generateSlug(val) }) }))
-                  }}
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#9ca3af', marginBottom: '6px' }}>Nombre que aparece en el perfil *</label>
+                <input type="text" value={nfcForm.display_name} onChange={e => { setNfcForm(p => ({ ...p, display_name: e.target.value })); if (!nfcProfile) setNfcForm(p => ({ ...p, slug: generateSlug(e.target.value) })) }}
                   placeholder="Ej: Juan García"
                   style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', fontSize: '13px', outline: 'none', backgroundColor: '#161616', border: '1px solid #2a2a2a', color: '#f0f0f0', boxSizing: 'border-box' }} />
               </div>
@@ -448,7 +428,6 @@ export default function ClienteDetallePage() {
               </div>
             </div>
 
-            {/* Links sociales */}
             <div style={{ borderRadius: '12px', padding: '16px', backgroundColor: '#161616', border: '1px solid #1f1f1f' }}>
               <p style={{ margin: '0 0 12px', fontSize: '12px', fontWeight: 700, color: '#9ca3af' }}>📱 Links del perfil</p>
               <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '10px' }}>
@@ -464,8 +443,7 @@ export default function ClienteDetallePage() {
                 ].map(({ key, label, placeholder }) => (
                   <div key={key}>
                     <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#6b7280', marginBottom: '5px' }}>{label}</label>
-                    <input type="text" value={nfcForm[key as keyof typeof nfcForm] as string}
-                      onChange={e => setNfcForm(p => ({ ...p, [key]: e.target.value }))} placeholder={placeholder}
+                    <input type="text" value={nfcForm[key as keyof typeof nfcForm] as string} onChange={e => setNfcForm(p => ({ ...p, [key]: e.target.value }))} placeholder={placeholder}
                       style={{ width: '100%', padding: '9px 11px', borderRadius: '9px', fontSize: '12px', outline: 'none', backgroundColor: '#0d0d0d', border: '1px solid #2a2a2a', color: '#f0f0f0', boxSizing: 'border-box' }} />
                   </div>
                 ))}
@@ -488,7 +466,7 @@ export default function ClienteDetallePage() {
               <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr 60px auto', gap: '8px', alignItems: 'flex-end' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '11px', color: '#6b7280', marginBottom: '4px' }}>Etiqueta</label>
-                  <input type="text" value={newLink.label} onChange={e => setNewLink(p => ({ ...p, label: e.target.value }))} placeholder="Mi portafolio"
+                  <input type="text" value={newLink.label} onChange={e => setNewLink(p => ({ ...p, label: e.target.value }))} placeholder="Ej: Mi portafolio"
                     style={{ width: '100%', padding: '9px 11px', borderRadius: '9px', fontSize: '12px', outline: 'none', backgroundColor: '#0d0d0d', border: '1px solid #2a2a2a', color: '#f0f0f0', boxSizing: 'border-box' }} />
                 </div>
                 <div>
@@ -502,10 +480,106 @@ export default function ClienteDetallePage() {
                     style={{ width: '100%', padding: '9px 11px', borderRadius: '9px', fontSize: '14px', outline: 'none', backgroundColor: '#0d0d0d', border: '1px solid #2a2a2a', color: '#f0f0f0', boxSizing: 'border-box', textAlign: 'center' }} />
                 </div>
                 <button onClick={addCustomLink} disabled={!newLink.label.trim() || !newLink.url.trim()}
-                  style={{ padding: '9px 14px', borderRadius: '9px', fontWeight: 700, fontSize: '13px', cursor: 'pointer', border: 'none', background: 'linear-gradient(90deg, #00cfff, #00ff94)', color: '#0d0d0d', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  style={{ padding: '9px 14px', borderRadius: '9px', fontWeight: 700, fontSize: '13px', cursor: 'pointer', border: 'none', background: 'linear-gradient(90deg, #00cfff, #00ff94)', color: '#0d0d0d' }}>
                   <Plus size={14} />
                 </button>
               </div>
+            </div>
+
+            {/* 🎨 Selector de plantilla visual */}
+            <div style={{ borderRadius: '12px', padding: '16px', backgroundColor: '#161616', border: '1px solid #1f1f1f' }}>
+              <p style={{ margin: '0 0 14px', fontSize: '12px', fontWeight: 700, color: '#9ca3af' }}>🎨 Plantilla visual del perfil</p>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
+                {TEMPLATE_PREVIEWS.map(tp => {
+                  const isSelected = nfcForm.template === tp.id
+                  return (
+                    <button
+                      key={tp.id}
+                      onClick={() => setNfcForm(p => ({ ...p, template: tp.id }))}
+                      style={{
+                        padding: 0,
+                        borderRadius: '12px',
+                        cursor: 'pointer',
+                        border: isSelected ? '2.5px solid #00cfff' : '2.5px solid transparent',
+                        overflow: 'hidden',
+                        backgroundColor: 'transparent',
+                        transform: isSelected ? 'scale(1.03)' : 'scale(1)',
+                        transition: 'all 0.18s ease',
+                        outline: 'none',
+                        boxShadow: isSelected ? '0 0 16px #00cfff33' : 'none',
+                      }}
+                    >
+                      {/* Mini preview del fondo */}
+                      <div style={{
+                        height: '64px',
+                        background: tp.bg,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '5px',
+                        position: 'relative',
+                        overflow: 'hidden',
+                      }}>
+                        {/* Dots de color */}
+                        <div style={{ display: 'flex', gap: '5px' }}>
+                          <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: tp.dot1 }} />
+                          <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: tp.dot2 }} />
+                        </div>
+                        {/* Texto "Aa" con gradiente */}
+                        <span style={{
+                          fontSize: '13px',
+                          fontWeight: 900,
+                          ...(tp.nameGrad
+                            ? { background: tp.nameGrad, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }
+                            : { color: (tp as { nameSolid?: string }).nameSolid ?? '#f0f0f0' }
+                          ),
+                          lineHeight: 1,
+                        }}>
+                          Aa
+                        </span>
+                        {/* Tick de selección */}
+                        {isSelected && (
+                          <div style={{
+                            position: 'absolute',
+                            top: '6px',
+                            right: '6px',
+                            width: '16px',
+                            height: '16px',
+                            borderRadius: '50%',
+                            backgroundColor: '#00cfff',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}>
+                            <Check size={10} color="#0d0d0d" strokeWidth={3} />
+                          </div>
+                        )}
+                      </div>
+                      {/* Nombre de la plantilla */}
+                      <div style={{
+                        padding: '6px 8px',
+                        backgroundColor: isSelected ? '#00cfff12' : '#0d0d0d',
+                        textAlign: 'center',
+                        borderTop: isSelected ? '1px solid #00cfff33' : '1px solid #1f1f1f',
+                      }}>
+                        <p style={{
+                          margin: 0,
+                          fontSize: '10px',
+                          fontWeight: 700,
+                          color: isSelected ? '#00cfff' : '#6b7280',
+                          letterSpacing: '0.02em',
+                        }}>
+                          {tp.name}
+                        </p>
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+              <p style={{ margin: '10px 0 0', fontSize: '11px', color: '#4b5563', textAlign: 'center' }}>
+                La plantilla define el fondo y colores del perfil público
+              </p>
             </div>
 
             {/* Toggle activo */}
@@ -520,14 +594,10 @@ export default function ClienteDetallePage() {
               </div>
             </div>
 
-            {nfcMessage && (
-              <div style={{ padding: '10px 12px', borderRadius: '8px', fontSize: '13px', backgroundColor: nfcMessage.type === 'success' ? '#00ff940d' : '#ff4d4d0d', border: `1px solid ${nfcMessage.type === 'success' ? '#00ff9422' : '#ff4d4d22'}`, color: nfcMessage.type === 'success' ? '#00ff94' : '#ff4d4d' }}>
-                {nfcMessage.text}
-              </div>
-            )}
+            {nfcMessage && <div style={{ padding: '10px 12px', borderRadius: '8px', fontSize: '13px', backgroundColor: nfcMessage.type === 'success' ? '#00ff940d' : '#ff4d4d0d', border: `1px solid ${nfcMessage.type === 'success' ? '#00ff9422' : '#ff4d4d22'}`, color: nfcMessage.type === 'success' ? '#00ff94' : '#ff4d4d' }}>{nfcMessage.text}</div>}
 
             <button onClick={handleSaveNFC} disabled={savingNFC}
-              style={{ padding: '13px', borderRadius: '12px', fontWeight: 800, fontSize: '14px', border: 'none', background: savingNFC ? '#2a2a2a' : `linear-gradient(90deg, ${activeTemplate.accent}, ${activeTemplate.accent}bb)`, color: savingNFC ? '#6b7280' : '#0d0d0d', cursor: savingNFC ? 'not-allowed' : 'pointer' }}>
+              style={{ padding: '13px', borderRadius: '12px', fontWeight: 800, fontSize: '14px', border: 'none', background: savingNFC ? '#2a2a2a' : 'linear-gradient(90deg, #00cfff, #00ff94)', color: savingNFC ? '#6b7280' : '#0d0d0d', cursor: savingNFC ? 'not-allowed' : 'pointer' }}>
               {savingNFC ? 'Guardando...' : nfcProfile ? '⚡ Actualizar Perfil NFC' : '⚡ Crear Perfil NFC'}
             </button>
           </div>
@@ -535,13 +605,9 @@ export default function ClienteDetallePage() {
       </div>
 
       {/* Mensaje global */}
-      {message && !editing && (
-        <div style={{ padding: '10px 12px', borderRadius: '8px', fontSize: '13px', backgroundColor: message.type === 'success' ? '#00ff940d' : '#ff4d4d0d', border: `1px solid ${message.type === 'success' ? '#00ff9422' : '#ff4d4d22'}`, color: message.type === 'success' ? '#00ff94' : '#ff4d4d' }}>
-          {message.text}
-        </div>
-      )}
+      {message && !editing && <div style={{ padding: '10px 12px', borderRadius: '8px', fontSize: '13px', backgroundColor: message.type === 'success' ? '#00ff940d' : '#ff4d4d0d', border: `1px solid ${message.type === 'success' ? '#00ff9422' : '#ff4d4d22'}`, color: message.type === 'success' ? '#00ff94' : '#ff4d4d' }}>{message.text}</div>}
 
-      {/* Historial de ventas */}
+      {/* Historial */}
       <div>
         <h2 style={{ margin: '0 0 14px', fontSize: '18px', fontWeight: 700, color: '#f0f0f0' }}>Historial ({sales.length})</h2>
         {sales.length === 0 ? (
