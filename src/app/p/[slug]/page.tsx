@@ -107,10 +107,9 @@ export default async function ProfilePage({params}:{params:Promise<{slug:string}
     ...(profile.custom_links||[]).map((l:CustomLink)=>({url:l.url,label:l.label,type:getCustomIcon(l.url)})),
   ].filter(Boolean) as {url:string;label:string;type:string}[]
 
-  // Separar: primeras 6 redes sociales → fila de íconos, el resto → botones de tarjeta
-  const socialTypes = ['whatsapp','instagram','tiktok','linkedin','facebook','youtube','email']
-  const socialLinks = allLinks.filter(l => socialTypes.includes(l.type)).slice(0, 6)
-  const cardLinks   = allLinks.filter(l => !socialTypes.includes(l.type) || !socialLinks.includes(l))
+  // Todos los links van como tarjetas completas
+  const socialLinks: typeof allLinks = []
+  const cardLinks = allLinks
 
   return(
     <>
@@ -308,20 +307,6 @@ export default async function ProfilePage({params}:{params:Promise<{slug:string}
           {profile.tagline && <p className="profile-tagline">{profile.tagline}</p>}
           {profile.company && <p className="profile-company">{profile.company}</p>}
 
-          {/* Social icon row */}
-          {socialLinks.length > 0 && (
-            <>
-              <div style={{height:'24px'}}/>
-              <div className="social-row">
-                {socialLinks.map((link,i)=>(
-                  <a key={i} href={link.url} target="_blank" rel="noopener noreferrer"
-                    className="social-icon-btn" title={link.label}>
-                    <BrandIcon type={link.type} color={theme.acc}/>
-                  </a>
-                ))}
-              </div>
-            </>
-          )}
         </div>
 
         {/* Thin divider */}
