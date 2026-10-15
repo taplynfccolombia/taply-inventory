@@ -123,38 +123,118 @@ export default async function ProfilePage({params}:{params:Promise<{slug:string}
     profile.website?{url:profile.website.startsWith('http')?profile.website:`https://${profile.website}`,label:'Sitio Web',type:'globe'}:null,
     ...(profile.custom_links||[]).map((l:CustomLink)=>({url:l.url,label:l.label,type:getCustomIcon(l.url)})),
   ].filter(Boolean) as {url:string;label:string;type:string}[]
+
+  const accentColor = theme.accent
+  const accentAlpha18 = `${theme.accent}18`
+  const accentAlpha40 = `${theme.accent}40`
+  const avatarGlow = theme.avatarBorder
+
   return(
-    <div style={{minHeight:'100vh',background:theme.bg,fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif'}}>
-      <div style={{background:theme.heroBg,paddingBottom:'50px',position:'relative'}}>
-          <div style={{height:'50px'}}/>
-        <div style={{display:'flex',flexDirection:'column',alignItems:'center',padding:'0 20px'}}>
-          {profile.avatar_url?(
-            <img src={profile.avatar_url} alt={profile.display_name} style={{width:'110px',height:'110px',borderRadius:'50%',objectFit:'cover',border:`3px solid ${theme.avatarBorder}`,boxShadow:`0 0 20px ${theme.avatarBorder}`}}/>
-          ):(
-            <div style={{width:'110px',height:'110px',borderRadius:'50%',background:theme.cardBg,border:`3px solid ${theme.avatarBorder}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'40px',color:theme.accent}}>{profile.display_name?.charAt(0)||'T'}</div>
-          )}
-          <div style={{height:'16px'}}/>
-          <h1 style={{margin:0,fontSize:'26px',fontWeight:700,letterSpacing:'-0.5px',...(theme.nameCss?{background:theme.nameCss,WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}:{color:textColor})}}>{profile.display_name}</h1>
-          {profile.tagline&&<p style={{margin:'6px 0 0',fontSize:'14px',color:theme.accent,fontWeight:500}}>{profile.tagline}</p>}
-          {profile.company&&<p style={{margin:'4px 0 0',fontSize:'13px',color:subColor}}>{profile.company}</p>}
-        </div>
-      </div>
-      <div style={{maxWidth:'420px',margin:'-20px auto 0',padding:'0 16px 40px',position:'relative',zIndex:1}}>
-        {allLinks.length>0&&(
-          <div style={{background:theme.cardBg,borderRadius:theme.radius,border:`1px solid ${theme.cardBorder}`,padding:'8px',display:'flex',flexDirection:'column',gap:'6px',marginBottom:'16px'}}>
-            {allLinks.map((link,i)=>(
-              <a key={i} href={link.url} target="_blank" rel="noopener noreferrer" style={{display:'flex',alignItems:'center',gap:'14px',padding:'14px 16px',borderRadius:theme.btnRadius,background:`${theme.accent}11`,border:`1px solid ${theme.accent}22`,textDecoration:'none',transition:'all 0.2s'}}>
-                <BrandIcon type={link.type} color={theme.accent}/>
-                <span style={{color:textColor,fontSize:'15px',fontWeight:500}}>{link.label}</span>
-              </a>
-            ))}
+    <>
+      <style>{`
+        @keyframes fadeInUp {
+          from { opacity: 0; transform: translateY(18px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes avatarEntrance {
+          from { opacity: 0; transform: scale(0.82); }
+          to   { opacity: 1; transform: scale(1); }
+        }
+        @keyframes nfcPulse {
+          0%   { box-shadow: 0 0 0 0 ${avatarGlow}, 0 0 20px ${avatarGlow}; }
+          60%  { box-shadow: 0 0 0 14px transparent, 0 0 26px ${avatarGlow}; }
+          100% { box-shadow: 0 0 0 0 transparent, 0 0 20px ${avatarGlow}; }
+        }
+        @keyframes nameSlide {
+          from { opacity: 0; transform: translateY(10px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes footerFade {
+          from { opacity: 0; }
+          to   { opacity: 1; }
+        }
+        .taply-avatar {
+          animation: avatarEntrance 0.55s cubic-bezier(0.34,1.56,0.64,1) both,
+                     nfcPulse 2.8s ease-in-out 0.8s infinite;
+        }
+        .taply-name {
+          animation: nameSlide 0.5s ease both;
+          animation-delay: 0.3s;
+          opacity: 0;
+        }
+        .taply-tagline {
+          animation: nameSlide 0.5s ease both;
+          animation-delay: 0.42s;
+          opacity: 0;
+        }
+        .taply-company {
+          animation: nameSlide 0.5s ease both;
+          animation-delay: 0.5s;
+          opacity: 0;
+        }
+        .link-btn {
+          display: flex;
+          align-items: center;
+          gap: 14px;
+          padding: 14px 16px;
+          text-decoration: none;
+          transition: transform 0.18s cubic-bezier(0.34,1.56,0.64,1),
+                      box-shadow 0.18s ease,
+                      background 0.18s ease;
+          animation: fadeInUp 0.45s ease both;
+          opacity: 0;
+          will-change: transform;
+          cursor: pointer;
+          -webkit-tap-highlight-color: transparent;
+        }
+        .link-btn:hover {
+          transform: scale(1.03) translateY(-1px);
+          background: ${accentAlpha18} !important;
+          box-shadow: 0 6px 24px ${accentAlpha40};
+        }
+        .link-btn:active {
+          transform: scale(0.96) !important;
+          transition-duration: 0.08s !important;
+          box-shadow: none !important;
+        }
+        .taply-footer {
+          animation: footerFade 0.6s ease both;
+          animation-delay: 0.7s;
+          opacity: 0;
+        }
+      `}</style>
+      <div style={{minHeight:'100vh',background:theme.bg,fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif'}}>
+        <div style={{background:theme.heroBg,paddingBottom:'50px',position:'relative'}}>
+          <div style={{height:'20px'}}/>
+          <div style={{display:'flex',flexDirection:'column',alignItems:'center',padding:'0 20px'}}>
+            {profile.avatar_url?(
+              <img src={profile.avatar_url} alt={profile.display_name} className="taply-avatar" style={{width:'110px',height:'110px',borderRadius:'50%',objectFit:'cover',border:`3px solid ${theme.avatarBorder}`}}/>
+            ):(
+              <div className="taply-avatar" style={{width:'110px',height:'110px',borderRadius:'50%',background:theme.cardBg,border:`3px solid ${theme.avatarBorder}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'40px',color:accentColor}}>{profile.display_name?.charAt(0)||'T'}</div>
+            )}
+            <div style={{height:'16px'}}/>
+            <h1 className="taply-name" style={{margin:0,fontSize:'26px',fontWeight:700,letterSpacing:'-0.5px',...(theme.nameCss?{background:theme.nameCss,WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}:{color:textColor})}}>{profile.display_name}</h1>
+            {profile.tagline&&<p className="taply-tagline" style={{margin:'6px 0 0',fontSize:'14px',color:accentColor,fontWeight:500}}>{profile.tagline}</p>}
+            {profile.company&&<p className="taply-company" style={{margin:'4px 0 0',fontSize:'13px',color:subColor}}>{profile.company}</p>}
           </div>
-        )}
-        <div style={{textAlign:'center',padding:'20px',background:theme.footerBg,borderRadius:theme.radius,border:`1px solid ${theme.cardBorder}`}}>
-          <p style={{margin:0,fontSize:'11px',color:mutedColor,letterSpacing:'0.5px',textTransform:'uppercase'}}>Powered by</p>
-          <p style={{margin:'4px 0 0',fontSize:'16px',fontWeight:700,color:theme.accent,letterSpacing:'1px'}}>TAPLY</p>
+        </div>
+        <div style={{maxWidth:'420px',margin:'-20px auto 0',padding:'0 16px 40px',position:'relative',zIndex:1}}>
+          {allLinks.length>0&&(
+            <div style={{background:theme.cardBg,borderRadius:theme.radius,border:`1px solid ${theme.cardBorder}`,padding:'8px',display:'flex',flexDirection:'column',gap:'6px',marginBottom:'16px'}}>
+              {allLinks.map((link,i)=>(
+                <a key={i} href={link.url} target="_blank" rel="noopener noreferrer" className="link-btn" style={{borderRadius:theme.btnRadius,background:`${theme.accent}11`,border:`1px solid ${theme.accent}22`,animationDelay:`${0.15+i*0.08}s`}}>
+                  <BrandIcon type={link.type} color={accentColor}/>
+                  <span style={{color:textColor,fontSize:'15px',fontWeight:500}}>{link.label}</span>
+                </a>
+              ))}
+            </div>
+          )}
+          <div className="taply-footer" style={{textAlign:'center',padding:'20px',background:theme.footerBg,borderRadius:theme.radius,border:`1px solid ${theme.cardBorder}`}}>
+            <p style={{margin:0,fontSize:'11px',color:mutedColor,letterSpacing:'0.5px',textTransform:'uppercase'}}>Powered by</p>
+            <p style={{margin:'4px 0 0',fontSize:'16px',fontWeight:700,color:accentColor,letterSpacing:'1px'}}>TAPLY</p>
+          </div>
         </div>
       </div>
-    </div>
+    </>
   )
 }
