@@ -9,7 +9,7 @@ import { formatCOP, formatDate, formatDateTime, PAYMENT_METHOD_LABELS, SALE_STAT
 import { useIsMobile } from '@/lib/hooks'
 import { ArrowLeft, User, ShoppingCart, TrendingUp, DollarSign, Ban, MessageCircle, Pencil, Check, X, Zap, Plus, Trash2, ExternalLink, Eye, Upload, Image } from 'lucide-react'
 
-interface CustomLink { label: string; url: string; icon: string }
+interface CustomLink { type: string; label: string; url: string }
 
 interface NFCProfile {
   id: string; slug: string; display_name: string; tagline: string | null
@@ -50,6 +50,20 @@ const TEMPLATE_PREVIEWS = [
   { id:'cromo',     name:'Cromo',       bg:'#0d0d0d', r1:'#dfe6e9', r2:'#b2bec3', acc:'#dfe6e9' },
 ]
 
+
+const PLATFORM_OPTIONS = [
+  { type: 'whatsapp',  emoji: '💬', name: 'WhatsApp',    placeholder: '573001234567',      hint: 'Número con código de país (ej: 573001234567)' },
+  { type: 'instagram', emoji: '📸', name: 'Instagram',   placeholder: '@usuario',           hint: 'Nombre de usuario (sin @) o URL completa' },
+  { type: 'tiktok',   emoji: '🎵', name: 'TikTok',      placeholder: '@usuario',           hint: 'Nombre de usuario en TikTok' },
+  { type: 'linkedin',  emoji: '💼', name: 'LinkedIn',    placeholder: 'URL o usuario',      hint: 'URL completa del perfil o nombre de usuario' },
+  { type: 'facebook',  emoji: '👥', name: 'Facebook',    placeholder: 'URL o página',       hint: 'URL del perfil o nombre de la página' },
+  { type: 'youtube',   emoji: '▶️', name: 'YouTube',     placeholder: '@canal o URL',       hint: 'URL del canal o handle (@canal)' },
+  { type: 'email',     emoji: '✉️', name: 'Email',       placeholder: 'correo@email.com',   hint: 'Dirección de correo electrónico' },
+  { type: 'website',   emoji: '🌐', name: 'Sitio Web',   placeholder: 'https://miweb.com',  hint: 'URL completa del sitio web' },
+  { type: 'phone',     emoji: '📞', name: 'Llamar',      placeholder: '3001234567',         hint: 'Número de teléfono para llamadas directas' },
+  { type: 'custom',    emoji: '🔗', name: 'Otro enlace', placeholder: 'https://...',        hint: 'Cualquier otro enlace personalizado' },
+]
+
 export default function ClienteDetallePage() {
   const { id } = useParams()
   const router = useRouter()
@@ -72,11 +86,10 @@ export default function ClienteDetallePage() {
   const [nfcMessage, setNfcMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [nfcForm, setNfcForm] = useState({
     slug: '', display_name: '', tagline: '', company: '', avatar_url: '',
-    whatsapp: '', email: '', website: '', instagram: '', tiktok: '',
-    linkedin: '', facebook: '', youtube: '', is_active: true, template: 'oscuro',
+    is_active: true, template: 'oscuro',
   })
   const [customLinks, setCustomLinks] = useState<CustomLink[]>([])
-  const [newLink, setNewLink] = useState({ label: '', url: '', icon: '🔗' })
+  const [newLink, setNewLink] = useState({ type: 'whatsapp', label: '', value: '' })
   const [previewAvatar, setPreviewAvatar] = useState<string | null>(null)
 
   async function fetchData() {
@@ -92,14 +105,29 @@ export default function ClienteDetallePage() {
       setNfcForm({
         slug: nfcRes.data.slug ?? '', display_name: nfcRes.data.display_name ?? '',
         tagline: nfcRes.data.tagline ?? '', company: nfcRes.data.company ?? '',
-        avatar_url: nfcRes.data.avatar_url ?? '', whatsapp: nfcRes.data.whatsapp ?? '',
-        email: nfcRes.data.email ?? '', website: nfcRes.data.website ?? '',
-        instagram: nfcRes.data.instagram ?? '', tiktok: nfcRes.data.tiktok ?? '',
-        linkedin: nfcRes.data.linkedin ?? '', facebook: nfcRes.data.facebook ?? '',
-        youtube: nfcRes.data.youtube ?? '', is_active: nfcRes.data.is_active ?? true,
-        template: nfcRes.data.template ?? 'default',
+        avatar_url: nfcRes.data.avatar_url ?? '', is_active: nfcRes.data.is_active ?? true,
+        template: nfcRes.data.template ?? 'oscuro',
       })
-      setCustomLinks(Array.isArray(nfcRes.data.custom_links) ? nfcRes.data.custom_links : [])
+      // Migrar de formato antiguo (campos separados) al nuevo (custom_links unificado)
+      const existingLinks = Array.isArray(nfcRes.data.custom_links) ? nfcRes.data.custom_links : []
+      const isNewFormat = existingLinks.length > 0 && 'type' in existingLinks[0]
+      if (isNewFormat) {
+        setCustomLinks(existingLinks)
+      } else {
+        const migrated: CustomLink[] = []
+        if (nfcRes.data.whatsapp) migrated.push({ type: 'whatsapp', label: 'WhatsApp', url: nfcRes.data.whatsapp })
+        if (nfcRes.data.instagram) migrated.push({ type: 'instagram', label: 'Instagram', url: nfcRes.data.instagram })
+        if (nfcRes.data.tiktok) migrated.push({ type: 'tiktok', label: 'TikTok', url: nfcRes.data.tiktok })
+        if (nfcRes.data.linkedin) migrated.push({ type: 'linkedin', label: 'LinkedIn', url: nfcRes.data.linkedin })
+        if (nfcRes.data.facebook) migrated.push({ type: 'facebook', label: 'Facebook', url: nfcRes.data.facebook })
+        if (nfcRes.data.youtube) migrated.push({ type: 'youtube', label: 'YouTube', url: nfcRes.data.youtube })
+        if (nfcRes.data.email) migrated.push({ type: 'email', label: 'Email', url: nfcRes.data.email })
+        if (nfcRes.data.website) migrated.push({ type: 'website', label: 'Sitio Web', url: nfcRes.data.website })
+        for (const l of existingLinks) {
+          if (l.url && l.label) migrated.push({ type: 'custom', label: l.label, url: l.url })
+        }
+        setCustomLinks(migrated)
+      }
       setPreviewAvatar(nfcRes.data.avatar_url ?? null)
     }
     if (clientRes.data) {
@@ -152,14 +180,16 @@ export default function ClienteDetallePage() {
     if (!nfcForm.slug.trim()) { setNfcMessage({ type: 'error', text: 'El slug (URL) es obligatorio.' }); return }
     const slugClean = generateSlug(nfcForm.slug)
     setSavingNFC(true); setNfcMessage(null)
+    const firstOfType = (t: string) => customLinks.find(l => l.type === t)?.url.trim() || null
     const payload = {
       client_id: id, slug: slugClean, display_name: nfcForm.display_name.trim(),
       tagline: nfcForm.tagline.trim() || null, company: nfcForm.company.trim() || null,
-      avatar_url: nfcForm.avatar_url.trim() || null, whatsapp: nfcForm.whatsapp.trim() || null,
-      email: nfcForm.email.trim() || null, website: nfcForm.website.trim() || null,
-      instagram: nfcForm.instagram.trim() || null, tiktok: nfcForm.tiktok.trim() || null,
-      linkedin: nfcForm.linkedin.trim() || null, facebook: nfcForm.facebook.trim() || null,
-      youtube: nfcForm.youtube.trim() || null, custom_links: customLinks,
+      avatar_url: nfcForm.avatar_url.trim() || null,
+      whatsapp: firstOfType('whatsapp'), email: firstOfType('email'),
+      website: firstOfType('website'), instagram: firstOfType('instagram'),
+      tiktok: firstOfType('tiktok'), linkedin: firstOfType('linkedin'),
+      facebook: firstOfType('facebook'), youtube: firstOfType('youtube'),
+      custom_links: customLinks,
       is_active: nfcForm.is_active, template: nfcForm.template,
     }
     let error
@@ -175,13 +205,15 @@ export default function ClienteDetallePage() {
     setSavingNFC(false)
   }
 
-  function addCustomLink() {
-    if (!newLink.label.trim() || !newLink.url.trim()) return
-    setCustomLinks(prev => [...prev, { ...newLink }])
-    setNewLink({ label: '', url: '', icon: '🔗' })
+  function addLink() {
+    if (!newLink.value.trim()) return
+    const platform = PLATFORM_OPTIONS.find(p => p.type === newLink.type)!
+    const label = newLink.label.trim() || platform.name
+    setCustomLinks(prev => [...prev, { type: newLink.type, label, url: newLink.value.trim() }])
+    setNewLink(prev => ({ ...prev, label: '', value: '' }))
   }
 
-  function removeCustomLink(i: number) { setCustomLinks(prev => prev.filter((_, idx) => idx !== i)) }
+  function removeLink(i: number) { setCustomLinks(prev => prev.filter((_, idx) => idx !== i)) }
 
   const completedSales = sales.filter(s => s.status === 'completada')
   const totalRevenue = completedSales.reduce((acc, s) => acc + Number(s.total_revenue), 0)
@@ -406,61 +438,72 @@ export default function ClienteDetallePage() {
               </div>
             </div>
 
+            {/* 🔗 Links del perfil — múltiples por plataforma */}
             <div style={{ borderRadius: '12px', padding: '16px', backgroundColor: '#161616', border: '1px solid #1f1f1f' }}>
-              <p style={{ margin: '0 0 12px', fontSize: '12px', fontWeight: 700, color: '#9ca3af' }}>📱 Links del perfil</p>
-              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '10px' }}>
-                {[
-                  { key: 'whatsapp', label: '💬 WhatsApp', placeholder: '3001234567' },
-                  { key: 'instagram', label: '📸 Instagram', placeholder: '@usuario' },
-                  { key: 'tiktok', label: '🎵 TikTok', placeholder: '@usuario' },
-                  { key: 'linkedin', label: '💼 LinkedIn', placeholder: '@usuario o URL' },
-                  { key: 'facebook', label: '👥 Facebook', placeholder: 'usuario o URL' },
-                  { key: 'youtube', label: '▶️ YouTube', placeholder: '@canal' },
-                  { key: 'email', label: '✉️ Email', placeholder: 'correo@email.com' },
-                  { key: 'website', label: '🌐 Sitio Web', placeholder: 'www.miweb.com' },
-                ].map(({ key, label, placeholder }) => (
-                  <div key={key}>
-                    <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#6b7280', marginBottom: '5px' }}>{label}</label>
-                    <input type="text" value={nfcForm[key as keyof typeof nfcForm] as string} onChange={e => setNfcForm(p => ({ ...p, [key]: e.target.value }))} placeholder={placeholder}
-                      style={{ width: '100%', padding: '9px 11px', borderRadius: '9px', fontSize: '12px', outline: 'none', backgroundColor: '#0d0d0d', border: '1px solid #2a2a2a', color: '#f0f0f0', boxSizing: 'border-box' }} />
-                  </div>
-                ))}
-              </div>
-            </div>
+              <p style={{ margin: '0 0 4px', fontSize: '12px', fontWeight: 700, color: '#9ca3af' }}>🔗 Links del perfil</p>
+              <p style={{ margin: '0 0 12px', fontSize: '11px', color: '#4b5563' }}>Agrega múltiples números, redes y botones de llamada</p>
 
-            {/* Links personalizados */}
-            <div style={{ borderRadius: '12px', padding: '16px', backgroundColor: '#161616', border: '1px solid #1f1f1f' }}>
-              <p style={{ margin: '0 0 12px', fontSize: '12px', fontWeight: 700, color: '#9ca3af' }}>🔗 Links personalizados</p>
-              {customLinks.map((link, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', padding: '10px 12px', borderRadius: '9px', backgroundColor: '#0d0d0d', border: '1px solid #2a2a2a' }}>
-                  <span style={{ fontSize: '16px' }}>{link.icon}</span>
-                  <span style={{ flex: 1, fontSize: '12px', color: '#f0f0f0', fontWeight: 600 }}>{link.label}</span>
-                  <span style={{ fontSize: '11px', color: '#6b7280' }}>{link.url.substring(0, 25)}{link.url.length > 25 ? '...' : ''}</span>
-                  <button onClick={() => removeCustomLink(i)} style={{ padding: '4px', borderRadius: '6px', cursor: 'pointer', backgroundColor: 'transparent', border: 'none', color: '#ff4d4d', display: 'flex', alignItems: 'center' }}>
-                    <Trash2 size={13} />
+              {/* Lista de links agregados */}
+              {customLinks.length > 0 && (
+                <div style={{ marginBottom: '12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  {customLinks.map((link, i) => {
+                    const plat = PLATFORM_OPTIONS.find(p => p.type === link.type) ?? PLATFORM_OPTIONS[PLATFORM_OPTIONS.length - 1]
+                    return (
+                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '9px 12px', borderRadius: '9px', backgroundColor: '#0d0d0d', border: '1px solid #2a2a2a' }}>
+                        <span style={{ fontSize: '16px', flexShrink: 0 }}>{plat.emoji}</span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <p style={{ margin: 0, fontSize: '12px', fontWeight: 600, color: '#f0f0f0' }}>{link.label}</p>
+                          <p style={{ margin: '1px 0 0', fontSize: '11px', color: '#6b7280', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{link.url}</p>
+                        </div>
+                        <button onClick={() => removeLink(i)} style={{ padding: '5px', borderRadius: '6px', cursor: 'pointer', backgroundColor: 'transparent', border: 'none', color: '#ff4d4d', display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+
+              {/* Agregar nuevo link */}
+              <div style={{ borderRadius: '10px', padding: '12px', backgroundColor: '#0d0d0d', border: '1px dashed #2a2a2a', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <p style={{ margin: 0, fontSize: '11px', fontWeight: 600, color: '#6b7280' }}>+ Agregar link</p>
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '148px 1fr', gap: '8px' }}>
+                  <select
+                    value={newLink.type}
+                    onChange={e => setNewLink(p => ({ ...p, type: e.target.value, label: '' }))}
+                    style={{ padding: '9px 10px', borderRadius: '9px', fontSize: '12px', outline: 'none', backgroundColor: '#161616', border: '1px solid #2a2a2a', color: '#f0f0f0', cursor: 'pointer' }}
+                  >
+                    {PLATFORM_OPTIONS.map(p => (
+                      <option key={p.type} value={p.type}>{p.emoji} {p.name}</option>
+                    ))}
+                  </select>
+                  <input
+                    type="text"
+                    value={newLink.value}
+                    onChange={e => setNewLink(p => ({ ...p, value: e.target.value }))}
+                    onKeyDown={e => { if (e.key === 'Enter') addLink() }}
+                    placeholder={PLATFORM_OPTIONS.find(p => p.type === newLink.type)?.placeholder ?? ''}
+                    style={{ width: '100%', padding: '9px 11px', borderRadius: '9px', fontSize: '12px', outline: 'none', backgroundColor: '#161616', border: '1px solid #2a2a2a', color: '#f0f0f0', boxSizing: 'border-box' }}
+                  />
+                </div>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <input
+                    type="text"
+                    value={newLink.label}
+                    onChange={e => setNewLink(p => ({ ...p, label: e.target.value }))}
+                    placeholder='Etiqueta opcional (ej: "WhatsApp Ventas")'
+                    style={{ flex: 1, padding: '9px 11px', borderRadius: '9px', fontSize: '12px', outline: 'none', backgroundColor: '#161616', border: '1px solid #2a2a2a', color: '#f0f0f0', boxSizing: 'border-box' }}
+                  />
+                  <button
+                    onClick={addLink}
+                    disabled={!newLink.value.trim()}
+                    style={{ padding: '9px 14px', borderRadius: '9px', fontWeight: 700, fontSize: '12px', cursor: newLink.value.trim() ? 'pointer' : 'not-allowed', border: 'none', background: newLink.value.trim() ? 'linear-gradient(90deg, #00cfff, #00ff94)' : '#2a2a2a', color: newLink.value.trim() ? '#0d0d0d' : '#6b7280', display: 'flex', alignItems: 'center', gap: '5px', flexShrink: 0 }}>
+                    <Plus size={13} /> Agregar
                   </button>
                 </div>
-              ))}
-              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr 60px auto', gap: '8px', alignItems: 'flex-end' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '11px', color: '#6b7280', marginBottom: '4px' }}>Etiqueta</label>
-                  <input type="text" value={newLink.label} onChange={e => setNewLink(p => ({ ...p, label: e.target.value }))} placeholder="Ej: Mi portafolio"
-                    style={{ width: '100%', padding: '9px 11px', borderRadius: '9px', fontSize: '12px', outline: 'none', backgroundColor: '#0d0d0d', border: '1px solid #2a2a2a', color: '#f0f0f0', boxSizing: 'border-box' }} />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '11px', color: '#6b7280', marginBottom: '4px' }}>URL</label>
-                  <input type="text" value={newLink.url} onChange={e => setNewLink(p => ({ ...p, url: e.target.value }))} placeholder="https://..."
-                    style={{ width: '100%', padding: '9px 11px', borderRadius: '9px', fontSize: '12px', outline: 'none', backgroundColor: '#0d0d0d', border: '1px solid #2a2a2a', color: '#f0f0f0', boxSizing: 'border-box' }} />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '11px', color: '#6b7280', marginBottom: '4px' }}>Emoji</label>
-                  <input type="text" value={newLink.icon} onChange={e => setNewLink(p => ({ ...p, icon: e.target.value }))}
-                    style={{ width: '100%', padding: '9px 11px', borderRadius: '9px', fontSize: '14px', outline: 'none', backgroundColor: '#0d0d0d', border: '1px solid #2a2a2a', color: '#f0f0f0', boxSizing: 'border-box', textAlign: 'center' }} />
-                </div>
-                <button onClick={addCustomLink} disabled={!newLink.label.trim() || !newLink.url.trim()}
-                  style={{ padding: '9px 14px', borderRadius: '9px', fontWeight: 700, fontSize: '13px', cursor: 'pointer', border: 'none', background: 'linear-gradient(90deg, #00cfff, #00ff94)', color: '#0d0d0d' }}>
-                  <Plus size={14} />
-                </button>
+                <p style={{ margin: 0, fontSize: '10px', color: '#374151' }}>
+                  💡 {PLATFORM_OPTIONS.find(p => p.type === newLink.type)?.hint}
+                </p>
               </div>
             </div>
 
