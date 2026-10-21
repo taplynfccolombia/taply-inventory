@@ -7,7 +7,7 @@ interface NFCProfile {
   company: string | null; avatar_url: string | null; whatsapp: string | null
   email: string | null; website: string | null; instagram: string | null
   tiktok: string | null; linkedin: string | null; facebook: string | null
-  youtube: string | null; location: string | null; custom_links: CustomLink[]; is_active: boolean
+  youtube: string | null; location: string | null; google_reviews_url: string | null; custom_links: CustomLink[]; is_active: boolean
   views: number; template: string
 }
 
@@ -52,6 +52,7 @@ function IconEmail({color}:{color:string}){return(<svg width="22" height="22" vi
 function IconGlobe({color}:{color:string}){return(<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>)}
 function IconLink({color}:{color:string}){return(<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>)}
 function IconMapPin({color}:{color:string}){return(<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>)}
+function IconStar({color}:{color:string}){return(<svg width="22" height="22" viewBox="0 0 24 24" fill={color} stroke={color} strokeWidth="1"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>)}
 function getCustomIcon(url:string):string{
   if(/wa\.me|whatsapp/i.test(url))return'whatsapp'
   if(/instagram/i.test(url))return'instagram'
@@ -72,6 +73,7 @@ function BrandIcon({type,color}:{type:string;color:string}){
   if(type==='email')return<IconEmail color={color}/>
   if(type==='globe')return<IconGlobe color={color}/>
   if(type==='location')return<IconMapPin color={color}/>
+  if(type==='reviews')return<IconStar color={color}/>
   return<IconLink color={color}/>
 }
 
@@ -107,6 +109,7 @@ export default async function ProfilePage({params}:{params:Promise<{slug:string}
     profile.email?{url:`mailto:${profile.email}`,label:'Email',type:'email'}:null,
     profile.website?{url:profile.website.startsWith('http')?profile.website:`https://${profile.website}`,label:'Sitio Web',type:'globe'}:null,
     profile.location?{url:`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(profile.location)}`,label:profile.location,type:'location'}:null,
+    profile.google_reviews_url?{url:profile.google_reviews_url,label:'Déjanos una reseña ⭐',type:'reviews'}:null,
     ...(profile.custom_links||[]).map((l:CustomLink)=>({url:l.url,label:l.label,type:getCustomIcon(l.url)})),
   ].filter(Boolean) as {url:string;label:string;type:string}[]
 
