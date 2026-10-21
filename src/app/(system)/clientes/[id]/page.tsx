@@ -16,7 +16,7 @@ interface NFCProfile {
   company: string | null; avatar_url: string | null; whatsapp: string | null
   email: string | null; website: string | null; instagram: string | null
   tiktok: string | null; linkedin: string | null; facebook: string | null
-  youtube: string | null; location: string | null; custom_links: CustomLink[]; is_active: boolean
+  youtube: string | null; location: string | null; google_reviews_url: string | null; custom_links: CustomLink[]; is_active: boolean
   views: number; template: string | null
 }
 
@@ -73,7 +73,7 @@ export default function ClienteDetallePage() {
   const [nfcForm, setNfcForm] = useState({
     slug: '', display_name: '', tagline: '', company: '', avatar_url: '',
     whatsapp: '', email: '', website: '', instagram: '', tiktok: '',
-    linkedin: '', facebook: '', youtube: '', location: '', is_active: true, template: 'oscuro',
+    linkedin: '', facebook: '', youtube: '', location: '', google_reviews_url: '', is_active: true, template: 'oscuro',
   })
   const [customLinks, setCustomLinks] = useState<CustomLink[]>([])
   const [newLink, setNewLink] = useState({ label: '', url: '', icon: '🔗' })
@@ -96,7 +96,7 @@ export default function ClienteDetallePage() {
         email: nfcRes.data.email ?? '', website: nfcRes.data.website ?? '',
         instagram: nfcRes.data.instagram ?? '', tiktok: nfcRes.data.tiktok ?? '',
         linkedin: nfcRes.data.linkedin ?? '', facebook: nfcRes.data.facebook ?? '',
-        youtube: nfcRes.data.youtube ?? '', location: nfcRes.data.location ?? '', is_active: nfcRes.data.is_active ?? true,
+        youtube: nfcRes.data.youtube ?? '', location: nfcRes.data.location ?? '', google_reviews_url: nfcRes.data.google_reviews_url ?? '', is_active: nfcRes.data.is_active ?? true,
         template: nfcRes.data.template ?? 'default',
       })
       setCustomLinks(Array.isArray(nfcRes.data.custom_links) ? nfcRes.data.custom_links : [])
@@ -159,7 +159,7 @@ export default function ClienteDetallePage() {
       email: nfcForm.email.trim() || null, website: nfcForm.website.trim() || null,
       instagram: nfcForm.instagram.trim() || null, tiktok: nfcForm.tiktok.trim() || null,
       linkedin: nfcForm.linkedin.trim() || null, facebook: nfcForm.facebook.trim() || null,
-      youtube: nfcForm.youtube.trim() || null, location: nfcForm.location.trim() || null, custom_links: customLinks,
+      youtube: nfcForm.youtube.trim() || null, location: nfcForm.location.trim() || null, google_reviews_url: nfcForm.google_reviews_url.trim() || null, custom_links: customLinks,
       is_active: nfcForm.is_active, template: nfcForm.template,
     }
     let error
@@ -419,6 +419,7 @@ export default function ClienteDetallePage() {
                   { key: 'email', label: '✉️ Email', placeholder: 'correo@email.com' },
                   { key: 'website', label: '🌐 Sitio Web', placeholder: 'www.miweb.com' },
                   { key: 'location', label: '📍 Ubicación', placeholder: 'Ej: Calle 100 #15-20, Bogotá' },
+                  { key: 'google_reviews_url', label: '⭐ Reseñas Google', placeholder: 'URL de reseñas de Google Maps' },
                 ].map(({ key, label, placeholder }) => (
                   <div key={key}>
                     <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#6b7280', marginBottom: '5px' }}>{label}</label>
