@@ -87,6 +87,7 @@ export default function ClienteDetallePage() {
   const [customLinks, setCustomLinks] = useState<CustomLink[]>([])
   const [newLink, setNewLink] = useState({ type: '', label: '', url: '' })
   const [previewAvatar, setPreviewAvatar] = useState<string | null>(null)
+  const addingRef = useRef(false)
 
   async function fetchData() {
     const [clientRes, salesRes, nfcRes] = await Promise.all([
@@ -217,9 +218,12 @@ export default function ClienteDetallePage() {
   }
 
   function addLink() {
+    if (addingRef.current) return
     if (!newLink.type || !newLink.url.trim()) return
+    addingRef.current = true
     setCustomLinks(prev => [...prev, { type: newLink.type, label: newLink.label || newLink.type, url: newLink.url.trim() }])
     setNewLink({ type: '', label: '', url: '' })
+    requestAnimationFrame(() => { addingRef.current = false })
   }
 
   function removeLink(i: number) { setCustomLinks(prev => prev.filter((_, idx) => idx !== i)) }
@@ -514,7 +518,6 @@ export default function ClienteDetallePage() {
                       <input type="text" value={newLink.url}
                         onChange={e => setNewLink(p => ({ ...p, url: e.target.value }))}
                         placeholder={selectedPlatformOpt.placeholder}
-                        onKeyDown={e => e.key === 'Enter' && addLink()}
                         style={{ width: '100%', padding: '9px 11px', borderRadius: '9px', fontSize: '12px', outline: 'none', backgroundColor: '#0d0d0d', border: '1px solid #00cfff44', color: '#f0f0f0', boxSizing: 'border-box' }} />
                     </div>
                     <div>
@@ -522,7 +525,6 @@ export default function ClienteDetallePage() {
                       <input type="text" value={newLink.label}
                         onChange={e => setNewLink(p => ({ ...p, label: e.target.value }))}
                         placeholder={selectedPlatformOpt.defaultLabel}
-                        onKeyDown={e => e.key === 'Enter' && addLink()}
                         style={{ width: '100%', padding: '9px 11px', borderRadius: '9px', fontSize: '12px', outline: 'none', backgroundColor: '#0d0d0d', border: '1px solid #2a2a2a', color: '#f0f0f0', boxSizing: 'border-box' }} />
                     </div>
                   </div>
