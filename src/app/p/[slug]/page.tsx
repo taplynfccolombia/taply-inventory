@@ -1,358 +1,266 @@
-import { createClient } from '@supabase/supabase-js'
+'use client'
 
-interface CustomLink { label: string; url: string; icon?: string }
+import { useEffect, useState } from 'react'
+import { useParams } from 'next/navigation'
+import { supabase } from '@/lib/supabase'
+
+interface CustomLink { type?: string; label: string; url: string; icon?: string }
 
 interface NFCProfile {
   id: string; slug: string; display_name: string; tagline: string | null
   company: string | null; avatar_url: string | null; whatsapp: string | null
   email: string | null; website: string | null; instagram: string | null
   tiktok: string | null; linkedin: string | null; facebook: string | null
-  youtube: string | null; location: string | null; google_reviews_url: string | null; custom_links: CustomLink[]; is_active: boolean
-  views: number; template: string
+  youtube: string | null; location: string | null; google_reviews_url: string | null
+  custom_links: CustomLink[]; is_active: boolean; views: number; template: string | null
 }
 
-// Sistema de 23 plantillas — token: bg, r1, r2, acc, label?, light?
-const T: Record<string, {bg:string;r1:string;r2:string;acc:string;label?:string;light?:boolean}> = {
-  // Originales
-  oscuro:    {bg:'#0f0f14', r1:'#00d4ff', r2:'#7c3aed', acc:'#00d4ff'},
-  fusion:    {bg:'#0c0c12', r1:'#c8a84b', r2:'#7c3aed', acc:'#c8a84b'},
-  claro:     {bg:'#f5f0ea', r1:'#c8b89a', r2:'#a08060', acc:'#8a6d4b', light:true},
-  // Paletas
-  dorado:    {bg:'#0b0a06', r1:'#d4a843', r2:'#b8860b', acc:'#d4a843'},
-  esmeralda: {bg:'#070f0a', r1:'#2ecc71', r2:'#1abc9c', acc:'#2ecc71'},
-  oceano:    {bg:'#060c14', r1:'#3498db', r2:'#2980b9', acc:'#3498db'},
-  rubi:      {bg:'#0f0609', r1:'#e74c3c', r2:'#c0392b', acc:'#e74c3c'},
-  plata:     {bg:'#0c0c0e', r1:'#bdc3c7', r2:'#95a5a6', acc:'#bdc3c7'},
-  violeta:   {bg:'#0a0714', r1:'#9b59b6', r2:'#8e44ad', acc:'#9b59b6'},
-  cobre:     {bg:'#0d0906', r1:'#e67e22', r2:'#d35400', acc:'#e67e22'},
-  aurora:    {bg:'#080d12', r1:'#00d4aa', r2:'#7c3aed', acc:'#00d4aa'},
-  jade:      {bg:'#06100c', r1:'#1abc9c', r2:'#16a085', acc:'#1abc9c'},
-  titanio:   {bg:'#0a0b0d', r1:'#7f8c8d', r2:'#95a5a6', acc:'#7f8c8d'},
-  ambar:     {bg:'#0e0b06', r1:'#f39c12', r2:'#e67e22', acc:'#f39c12'},
-  zafiro:    {bg:'#060a14', r1:'#2980b9', r2:'#1a5276', acc:'#2980b9'},
-  carmesi:   {bg:'#100608', r1:'#c0392b', r2:'#922b21', acc:'#c0392b'},
-  neon:      {bg:'#050512', r1:'#ff00ff', r2:'#00ffff', acc:'#ff00ff'},
-  cielo:     {bg:'#060c14', r1:'#74b9ff', r2:'#0984e3', acc:'#74b9ff'},
-  coral:     {bg:'#110808', r1:'#fd79a8', r2:'#e84393', acc:'#fd79a8'},
-  menta:     {bg:'#f8fffc', r1:'#00b894', r2:'#00cec9', acc:'#00b894', light:true},
-  indigo:    {bg:'#070514', r1:'#6c5ce7', r2:'#a29bfe', acc:'#6c5ce7'},
-  arena:     {bg:'#faf7f0', r1:'#b8860b', r2:'#a0784a', acc:'#8b6914', light:true},
-  cromo:     {bg:'#0d0d0d', r1:'#dfe6e9', r2:'#b2bec3', acc:'#dfe6e9'},
-  // Fallback para templates antiguos — redirigen a oscuro
-  default:   {bg:'#0f0f14', r1:'#00d4ff', r2:'#7c3aed', acc:'#00d4ff'},
+interface TemplateConfig {
+  pageBg: string; heroBg: string; nameGrad: string | null; nameSolid: string | null
+  taglineColor: string; companyColor: string; avatarBorder: string; avatarGlow: string
+  avatarTextColor: string; linkBg: string; linkBorder: string; linkColor: string
+  arrowColor: string; badgeBg: string; badgeBorder: string; badgeColor: string
+  dividerColor: string; glow: string; bodyColor: string; iconAlpha: string; iconBorderAlpha: string
 }
 
-function IconWhatsApp({color}:{color:string}){return(<svg width="22" height="22" viewBox="0 0 24 24" fill={color}><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.127.558 4.122 1.532 5.856L.054 23.25a.75.75 0 0 0 .916.921l5.487-1.455A11.943 11.943 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.75a9.713 9.713 0 0 1-4.953-1.354l-.355-.211-3.684.977.991-3.598-.232-.371A9.713 9.713 0 0 1 2.25 12C2.25 6.615 6.615 2.25 12 2.25S21.75 6.615 21.75 12 17.385 21.75 12 21.75z"/></svg>)}
-function IconInstagram({color}:{color:string}){return(<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1.5" fill={color} stroke="none"/></svg>)}
-function IconTikTok({color}:{color:string}){return(<svg width="22" height="22" viewBox="0 0 24 24" fill={color}><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.28 0 .54.04.79.1V9.01a6.33 6.33 0 0 0-.79-.05 6.34 6.34 0 0 0-6.34 6.34 6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.33-6.34V8.69a8.18 8.18 0 0 0 4.78 1.52V6.73a4.85 4.85 0 0 1-1.01-.04z"/></svg>)}
-function IconLinkedIn({color}:{color:string}){return(<svg width="22" height="22" viewBox="0 0 24 24" fill={color}><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 0 1-2.063-2.065 2.064 2.064 0 1 1 2.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>)}
-function IconFacebook({color}:{color:string}){return(<svg width="22" height="22" viewBox="0 0 24 24" fill={color}><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>)}
-function IconYouTube({color}:{color:string}){return(<svg width="22" height="22" viewBox="0 0 24 24" fill={color}><path d="M23.495 6.205a3.007 3.007 0 0 0-2.088-2.088c-1.87-.501-9.396-.501-9.396-.501s-7.507-.01-9.396.501A3.007 3.007 0 0 0 .527 6.205a31.247 31.247 0 0 0-.522 5.805 31.247 31.247 0 0 0 .522 5.783 3.007 3.007 0 0 0 2.088 2.088c1.868.502 9.396.502 9.396.502s7.506 0 9.396-.502a3.007 3.007 0 0 0 2.088-2.088 31.247 31.247 0 0 0 .5-5.783 31.247 31.247 0 0 0-.5-5.805zM9.609 15.601V8.408l6.264 3.602z"/></svg>)}
-function IconEmail({color}:{color:string}){return(<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>)}
-function IconGlobe({color}:{color:string}){return(<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>)}
-function IconLink({color}:{color:string}){return(<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>)}
-function IconMapPin({color}:{color:string}){return(<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>)}
-function IconStar({color}:{color:string}){return(<svg width="22" height="22" viewBox="0 0 24 24" fill={color} stroke={color} strokeWidth="1"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>)}
-function getCustomIcon(url:string):string{
-  if(/wa\.me|whatsapp/i.test(url))return'whatsapp'
-  if(/instagram/i.test(url))return'instagram'
-  if(/tiktok/i.test(url))return'tiktok'
-  if(/linkedin/i.test(url))return'linkedin'
-  if(/facebook|fb\.com/i.test(url))return'facebook'
-  if(/youtube|youtu\.be/i.test(url))return'youtube'
-  if(/^mailto/i.test(url))return'email'
-  return'link'
-}
-function BrandIcon({type,color}:{type:string;color:string}){
-  if(type==='whatsapp')return<IconWhatsApp color={color}/>
-  if(type==='instagram')return<IconInstagram color={color}/>
-  if(type==='tiktok')return<IconTikTok color={color}/>
-  if(type==='linkedin')return<IconLinkedIn color={color}/>
-  if(type==='facebook')return<IconFacebook color={color}/>
-  if(type==='youtube')return<IconYouTube color={color}/>
-  if(type==='email')return<IconEmail color={color}/>
-  if(type==='globe')return<IconGlobe color={color}/>
-  if(type==='location')return<IconMapPin color={color}/>
-  if(type==='reviews')return<IconStar color={color}/>
-  return<IconLink color={color}/>
+const TEMPLATES: Record<string, TemplateConfig> = {
+  default: {
+    pageBg: '#0a0a0a', heroBg: 'linear-gradient(180deg, #111111 0%, #0a0a0a 100%)',
+    nameGrad: 'linear-gradient(90deg, #00cfff, #00ff94)', nameSolid: null,
+    taglineColor: '#9ca3af', companyColor: '#4b5563', avatarBorder: '#00cfff55',
+    avatarGlow: '0 0 24px #00cfff22', avatarTextColor: '#00cfff', linkBg: '#161616',
+    linkBorder: '#1f1f1f', linkColor: '#f0f0f0', arrowColor: '#374151',
+    badgeBg: '#00cfff0d', badgeBorder: '#00cfff22', badgeColor: '#00cfff',
+    dividerColor: '#1f1f1f', glow: 'none', bodyColor: '#f0f0f0', iconAlpha: '18', iconBorderAlpha: '33',
+  },
+  ocean: {
+    pageBg: 'linear-gradient(160deg, #00091a 0%, #001a3a 45%, #000c20 100%)', heroBg: 'transparent',
+    nameGrad: 'linear-gradient(90deg, #60efff, #0096ff)', nameSolid: null,
+    taglineColor: '#93c5fd', companyColor: '#3b82f6', avatarBorder: '#0096ff66',
+    avatarGlow: '0 0 32px #0096ff33', avatarTextColor: '#60efff',
+    linkBg: 'rgba(0, 40, 100, 0.45)', linkBorder: 'rgba(0, 150, 255, 0.22)', linkColor: '#e0f4ff',
+    arrowColor: '#1d4ed8', badgeBg: 'rgba(0, 150, 255, 0.08)', badgeBorder: 'rgba(0, 150, 255, 0.22)',
+    badgeColor: '#60efff', dividerColor: 'rgba(0, 150, 255, 0.15)',
+    glow: 'radial-gradient(ellipse 80% 45% at 50% 0%, rgba(0, 100, 255, 0.2) 0%, transparent 100%)',
+    bodyColor: '#e0f4ff', iconAlpha: '20', iconBorderAlpha: '40',
+  },
+  gold: {
+    pageBg: 'linear-gradient(160deg, #0d0900 0%, #1a1200 50%, #0a0800 100%)', heroBg: 'transparent',
+    nameGrad: 'linear-gradient(90deg, #d4af37, #ffd700)', nameSolid: null,
+    taglineColor: '#b8970a', companyColor: '#78600a', avatarBorder: '#d4af3777',
+    avatarGlow: '0 0 32px #d4af3733', avatarTextColor: '#d4af37',
+    linkBg: 'rgba(212, 175, 55, 0.07)', linkBorder: 'rgba(212, 175, 55, 0.18)', linkColor: '#f5e6c8',
+    arrowColor: '#78600a', badgeBg: 'rgba(212, 175, 55, 0.08)', badgeBorder: 'rgba(212, 175, 55, 0.22)',
+    badgeColor: '#d4af37', dividerColor: 'rgba(212, 175, 55, 0.12)',
+    glow: 'radial-gradient(ellipse 60% 35% at 50% 0%, rgba(212, 175, 55, 0.15) 0%, transparent 100%)',
+    bodyColor: '#f5e6c8', iconAlpha: '18', iconBorderAlpha: '35',
+  },
+  aurora: {
+    pageBg: 'linear-gradient(160deg, #030014 0%, #0a0020 30%, #001a10 70%, #050020 100%)', heroBg: 'transparent',
+    nameGrad: 'linear-gradient(90deg, #00ff94, #a855f7)', nameSolid: null,
+    taglineColor: '#c4b5fd', companyColor: '#7c3aed', avatarBorder: '#a855f777',
+    avatarGlow: '0 0 32px #a855f733', avatarTextColor: '#a855f7',
+    linkBg: 'rgba(88, 28, 135, 0.22)', linkBorder: 'rgba(168, 85, 247, 0.2)', linkColor: '#f0e8ff',
+    arrowColor: '#6b21a8', badgeBg: 'rgba(168, 85, 247, 0.08)', badgeBorder: 'rgba(168, 85, 247, 0.22)',
+    badgeColor: '#a855f7', dividerColor: 'rgba(168, 85, 247, 0.12)',
+    glow: 'radial-gradient(ellipse 60% 30% at 70% 5%, rgba(168, 85, 247, 0.18) 0%, transparent 60%), radial-gradient(ellipse 50% 25% at 15% 65%, rgba(0, 255, 148, 0.1) 0%, transparent 60%)',
+    bodyColor: '#f0e8ff', iconAlpha: '22', iconBorderAlpha: '40',
+  },
+  sunset: {
+    pageBg: 'linear-gradient(160deg, #180010 0%, #1f0a00 55%, #0f0000 100%)', heroBg: 'transparent',
+    nameGrad: 'linear-gradient(90deg, #ff6b35, #f7931a)', nameSolid: null,
+    taglineColor: '#fdba74', companyColor: '#92400e', avatarBorder: '#ff6b3577',
+    avatarGlow: '0 0 32px #ff6b3533', avatarTextColor: '#ff6b35',
+    linkBg: 'rgba(180, 60, 20, 0.18)', linkBorder: 'rgba(255, 107, 53, 0.2)', linkColor: '#fff1ec',
+    arrowColor: '#92400e', badgeBg: 'rgba(255, 107, 53, 0.08)', badgeBorder: 'rgba(255, 107, 53, 0.22)',
+    badgeColor: '#ff6b35', dividerColor: 'rgba(255, 107, 53, 0.12)',
+    glow: 'radial-gradient(ellipse 70% 35% at 50% 0%, rgba(255, 100, 50, 0.18) 0%, transparent 100%)',
+    bodyColor: '#fff1ec', iconAlpha: '18', iconBorderAlpha: '35',
+  },
+  minimal: {
+    pageBg: '#f2f2f2', heroBg: 'linear-gradient(180deg, #ffffff 0%, #f2f2f2 100%)',
+    nameGrad: null, nameSolid: '#0d0d0d',
+    taglineColor: '#6b7280', companyColor: '#9ca3af', avatarBorder: '#0d0d0d22',
+    avatarGlow: '0 2px 16px rgba(0,0,0,0.08)', avatarTextColor: '#0d0d0d',
+    linkBg: '#ffffff', linkBorder: '#e5e7eb', linkColor: '#111827', arrowColor: '#d1d5db',
+    badgeBg: 'rgba(0,0,0,0.04)', badgeBorder: 'rgba(0,0,0,0.1)', badgeColor: '#6b7280',
+    dividerColor: '#e5e7eb', glow: 'none', bodyColor: '#111827', iconAlpha: '14', iconBorderAlpha: '28',
+  },
 }
 
-export default async function ProfilePage({params}:{params:Promise<{slug:string}>}){
-  const {slug} = await params
-  const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!,process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
-  const {data:profile} = await supabase.from('nfc_profiles').select('*').eq('slug',slug).eq('is_active',true).single() as {data:NFCProfile|null}
-  if(!profile)return(
-    <div style={{minHeight:'100vh',background:'#0f0f14',display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontFamily:'sans-serif',flexDirection:'column',gap:'12px'}}>
-      <div style={{fontSize:'48px'}}>404</div>
-      <div style={{color:'#666'}}>Perfil no encontrado</div>
+const PLATFORM_META: Record<string, { icon: string; color: string }> = {
+  whatsapp:  { icon: '💬', color: '#25d366' },
+  phone:     { icon: '📞', color: '#34a853' },
+  instagram: { icon: '📸', color: '#e1306c' },
+  tiktok:    { icon: '🎵', color: '#ff0050' },
+  facebook:  { icon: '👥', color: '#1877f2' },
+  youtube:   { icon: '▶️', color: '#ff0000' },
+  linkedin:  { icon: '💼', color: '#0077b5' },
+  email:     { icon: '✉️', color: '#00cfff' },
+  website:   { icon: '🌐', color: '#00ff94' },
+  location:  { icon: '📍', color: '#ea4335' },
+  reviews:   { icon: '⭐', color: '#fbbc05' },
+}
+
+function getLinkHref(type: string | undefined, url: string): string {
+  const v = url.trim()
+  switch (type) {
+    case 'whatsapp':  return `https://wa.me/57${v.replace(/\D/g, '')}`
+    case 'phone':     return `tel:${v.replace(/\D/g, '')}`
+    case 'instagram': return `https://instagram.com/${v.replace('@', '')}`
+    case 'tiktok':    return `https://tiktok.com/@${v.replace('@', '')}`
+    case 'facebook':  return v.startsWith('http') ? v : `https://facebook.com/${v}`
+    case 'youtube':   return v.startsWith('http') ? v : `https://youtube.com/@${v.replace('@', '')}`
+    case 'linkedin':  return v.startsWith('http') ? v : `https://linkedin.com/in/${v.replace('@', '')}`
+    case 'email':     return `mailto:${v}`
+    case 'location':  return v
+    case 'reviews':   return v
+    default:          return v.startsWith('http') ? v : `https://${v}`
+  }
+}
+
+export default function ProfilePage() {
+  const params = useParams()
+  const slug = params.slug as string
+  const [profile, setProfile] = useState<NFCProfile | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [notFound, setNotFound] = useState(false)
+
+  useEffect(() => {
+    async function fetchProfile() {
+      const { data, error } = await supabase
+        .from('nfc_profiles').select('*').eq('slug', slug).eq('is_active', true).single()
+      if (error || !data) { setNotFound(true) }
+      else {
+        setProfile(data as NFCProfile)
+        await supabase.rpc('increment_profile_views', { profile_slug: slug })
+      }
+      setLoading(false)
+    }
+    if (slug) fetchProfile()
+  }, [slug])
+
+  if (loading) return (
+    <div style={{ minHeight: '100vh', backgroundColor: '#0a0a0a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ width: '32px', height: '32px', borderRadius: '50%', border: '3px solid #00cfff22', borderTopColor: '#00cfff', animation: 'spin 0.8s linear infinite' }} />
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } } * { box-sizing: border-box; margin: 0; padding: 0; } body { background: #0a0a0a !important; }`}</style>
     </div>
   )
-  await supabase.from('nfc_profiles').update({views:(profile.views||0)+1}).eq('id',profile.id)
 
-  // Resolve template — cualquier ID antiguo (ocean, gold, etc.) cae a oscuro
-  const theme = T[profile.template] || T.oscuro
-  const isLight = !!theme.light
-  const textColor = isLight ? '#1a1a1a' : '#f0f0f0'
-  const subColor  = isLight ? '#555555' : '#9ca3af'
-  const mutedColor= isLight ? '#888888' : '#6b7280'
-  const cardBg    = isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.04)'
-  const cardBorder= isLight ? `${theme.acc}28` : `${theme.acc}22`
-  const monogram  = profile.display_name?.charAt(0)?.toUpperCase() || 'T'
+  if (notFound || !profile) return (
+    <div style={{ minHeight: '100vh', backgroundColor: '#0a0a0a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '16px' }}>
+      <style>{`* { box-sizing: border-box; margin: 0; padding: 0; } body { background: #0a0a0a !important; }`}</style>
+      <p style={{ fontSize: '48px' }}>⚡</p>
+      <p style={{ color: '#6b7280', fontSize: '16px' }}>Perfil no encontrado</p>
+      <p style={{ color: '#374151', fontSize: '13px' }}>Este enlace no existe o fue desactivado</p>
+    </div>
+  )
 
-  const allLinks=[
-    profile.whatsapp?{url:profile.whatsapp.startsWith('http')?profile.whatsapp:`https://wa.me/${profile.whatsapp.replace(/\D/g,'')}`,label:'WhatsApp',type:'whatsapp'}:null,
-    profile.instagram?{url:profile.instagram.startsWith('http')?profile.instagram:`https://instagram.com/${profile.instagram.replace('@','')}`,label:'Instagram',type:'instagram'}:null,
-    profile.tiktok?{url:profile.tiktok.startsWith('http')?profile.tiktok:`https://tiktok.com/@${profile.tiktok.replace('@','')}`,label:'TikTok',type:'tiktok'}:null,
-    profile.linkedin?{url:profile.linkedin.startsWith('http')?profile.linkedin:`https://linkedin.com/in/${profile.linkedin}`,label:'LinkedIn',type:'linkedin'}:null,
-    profile.facebook?{url:profile.facebook.startsWith('http')?profile.facebook:`https://facebook.com/${profile.facebook}`,label:'Facebook',type:'facebook'}:null,
-    profile.youtube?{url:profile.youtube.startsWith('http')?profile.youtube:`https://youtube.com/@${profile.youtube.replace('@','')}`,label:'YouTube',type:'youtube'}:null,
-    profile.email?{url:`mailto:${profile.email}`,label:'Email',type:'email'}:null,
-    profile.website?{url:profile.website.startsWith('http')?profile.website:`https://${profile.website}`,label:'Sitio Web',type:'globe'}:null,
-    profile.location?{url:`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(profile.location)}`,label:profile.location,type:'location'}:null,
-    profile.google_reviews_url?{url:profile.google_reviews_url,label:'Déjanos una reseña ⭐',type:'reviews'}:null,
-    ...(profile.custom_links||[]).map((l:CustomLink)=>({url:l.url,label:l.label,type:getCustomIcon(l.url)})),
-  ].filter(Boolean) as {url:string;label:string;type:string}[]
+  const t = TEMPLATES[profile.template ?? 'default'] ?? TEMPLATES.default
 
-  // Todos los links van como tarjetas completas
-  const socialLinks: typeof allLinks = []
-  const cardLinks = allLinks
+  const rawLinks: CustomLink[] = Array.isArray(profile.custom_links) ? profile.custom_links : []
+  const isNewFormat = rawLinks.length > 0 && typeof (rawLinks[0] as any).type === 'string'
 
-  return(
+  let linksToRender: Array<{ icon: string; color: string; label: string; href: string }> = []
+
+  if (isNewFormat) {
+    linksToRender = rawLinks.map(link => {
+      const meta = PLATFORM_META[link.type ?? ''] ?? { icon: '🔗', color: '#888888' }
+      return {
+        icon: meta.icon,
+        color: meta.color,
+        label: link.label || link.type || 'Link',
+        href: getLinkHref(link.type, link.url),
+      }
+    })
+  } else {
+    const legacySocial = [
+      { key: 'whatsapp',  value: profile.whatsapp,  label: 'WhatsApp',  icon: '💬', color: '#25d366', href: (v: string) => `https://wa.me/57${v.replace(/\D/g, '')}` },
+      { key: 'instagram', value: profile.instagram, label: 'Instagram', icon: '📸', color: '#e1306c', href: (v: string) => `https://instagram.com/${v.replace('@', '')}` },
+      { key: 'tiktok',    value: profile.tiktok,    label: 'TikTok',    icon: '🎵', color: '#ff0050', href: (v: string) => `https://tiktok.com/@${v.replace('@', '')}` },
+      { key: 'linkedin',  value: profile.linkedin,  label: 'LinkedIn',  icon: '💼', color: '#0077b5', href: (v: string) => v.startsWith('http') ? v : `https://linkedin.com/in/${v.replace('@', '')}` },
+      { key: 'facebook',  value: profile.facebook,  label: 'Facebook',  icon: '👥', color: '#1877f2', href: (v: string) => v.startsWith('http') ? v : `https://facebook.com/${v}` },
+      { key: 'youtube',   value: profile.youtube,   label: 'YouTube',   icon: '▶️', color: '#ff0000', href: (v: string) => v.startsWith('http') ? v : `https://youtube.com/@${v.replace('@', '')}` },
+      { key: 'email',     value: profile.email,     label: 'Email',     icon: '✉️', color: '#00cfff', href: (v: string) => `mailto:${v}` },
+      { key: 'website',   value: profile.website,   label: 'Sitio Web', icon: '🌐', color: '#00ff94', href: (v: string) => v.startsWith('http') ? v : `https://${v}` },
+    ].filter(l => l.value)
+
+    linksToRender = [
+      ...legacySocial.map(l => ({ icon: l.icon, color: l.color, label: l.label, href: l.href(l.value!) })),
+      ...rawLinks.filter(l => !l.type && l.url).map(l => ({ icon: l.icon ?? '🔗', color: '#888888', label: l.label || 'Link', href: l.url.startsWith('http') ? l.url : `https://${l.url}` })),
+    ]
+  }
+
+  return (
     <>
-      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=DM+Sans:wght@400;500;600&display=swap"/>
       <style>{`
-        * { box-sizing: border-box; }
-        body { margin: 0; }
-
-        @keyframes tRing {
-          from { transform: rotate(0deg); }
-          to   { transform: rotate(360deg); }
-        }
-        @keyframes fadeUp {
-          from { opacity: 0; transform: translateY(16px); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes scaleIn {
-          from { opacity: 0; transform: scale(0.85); }
-          to   { opacity: 1; transform: scale(1); }
-        }
-        @keyframes slideDown {
-          from { opacity: 0; transform: translateY(-8px); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
-
-        .ring-wrap {
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+          background: ${t.pageBg} !important;
+          color: ${t.bodyColor};
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+          min-height: 100vh;
+          display: flex;
+          align-items: flex-start;
+          justify-content: center;
+          padding: 0 0 40px 0;
           position: relative;
-          width: 118px;
-          height: 118px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          animation: scaleIn 0.55s cubic-bezier(0.34,1.56,0.64,1) both;
         }
-        .ring-spin {
-          position: absolute;
+        body::before {
+          content: '';
+          position: fixed;
           inset: 0;
-          border-radius: 50%;
-          background: conic-gradient(${theme.r1}, ${theme.r2}, ${theme.r1});
-          animation: tRing 6s linear infinite;
+          background: ${t.glow};
+          pointer-events: none;
+          z-index: 0;
         }
-        .ring-inner {
-          position: absolute;
-          inset: 3px;
-          border-radius: 50%;
-          background: ${theme.bg};
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          overflow: hidden;
-        }
-        .monogram {
-          font-family: 'Playfair Display', Georgia, serif;
-          font-size: 42px;
-          font-weight: 700;
-          color: ${theme.acc};
-          line-height: 1;
-          user-select: none;
-        }
-        .profile-name {
-          font-family: 'DM Sans', -apple-system, sans-serif;
-          font-size: 24px;
-          font-weight: 600;
-          color: ${textColor};
-          margin: 0;
-          letter-spacing: -0.3px;
-          animation: slideDown 0.45s ease both;
-          animation-delay: 0.3s;
-          opacity: 0;
-        }
-        .profile-tagline {
-          font-family: 'DM Sans', sans-serif;
-          font-size: 14px;
-          font-weight: 500;
-          color: ${theme.acc};
-          margin: 6px 0 0;
-          animation: slideDown 0.45s ease both;
-          animation-delay: 0.42s;
-          opacity: 0;
-        }
-        .profile-company {
-          font-family: 'DM Sans', sans-serif;
-          font-size: 13px;
-          color: ${subColor};
-          margin: 4px 0 0;
-          animation: slideDown 0.45s ease both;
-          animation-delay: 0.52s;
-          opacity: 0;
-        }
-        .social-row {
-          display: flex;
-          justify-content: center;
-          gap: 10px;
-          animation: fadeUp 0.45s ease both;
-          animation-delay: 0.55s;
-          opacity: 0;
-        }
-        .social-icon-btn {
-          width: 46px;
-          height: 46px;
-          border-radius: 12px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          background: ${cardBg};
-          border: 1px solid ${cardBorder};
-          text-decoration: none;
-          transition: transform 0.18s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.18s ease;
-          -webkit-tap-highlight-color: transparent;
-          backdrop-filter: blur(8px);
-        }
-        .social-icon-btn:hover {
-          transform: scale(1.12) translateY(-2px);
-          box-shadow: 0 6px 20px ${theme.acc}40;
-        }
-        .social-icon-btn:active {
-          transform: scale(0.94) !important;
-          transition-duration: 0.08s !important;
-        }
-        .card-link {
-          display: flex;
-          align-items: center;
-          gap: 14px;
-          padding: 14px 18px;
-          text-decoration: none;
-          background: ${cardBg};
-          border: 1px solid ${cardBorder};
-          border-radius: 14px;
-          backdrop-filter: blur(8px);
-          -webkit-backdrop-filter: blur(8px);
-          transition: transform 0.18s cubic-bezier(0.34,1.56,0.64,1),
-                      box-shadow 0.18s ease,
-                      background 0.18s ease;
-          animation: fadeUp 0.45s ease both;
-          opacity: 0;
-          -webkit-tap-highlight-color: transparent;
-        }
-        .card-link:hover {
-          transform: scale(1.025) translateY(-1px);
-          background: ${theme.acc}14;
-          box-shadow: 0 6px 28px ${theme.acc}30;
-          border-color: ${theme.acc}44;
-        }
-        .card-link:active {
-          transform: scale(0.97) !important;
-          transition-duration: 0.08s !important;
-          box-shadow: none !important;
-        }
-        .taply-footer {
-          animation: fadeUp 0.5s ease both;
-          animation-delay: 0.8s;
-          opacity: 0;
-        }
-        .divider-line {
-          width: 40px;
-          height: 1px;
-          background: linear-gradient(90deg, ${theme.r1}66, ${theme.r2}66);
-          margin: 0 auto;
-        }
+        .nfc-container { width: 100%; max-width: 480px; display: flex; flex-direction: column; align-items: center; position: relative; z-index: 1; }
+        .nfc-hero { width: 100%; padding: 56px 24px 36px; display: flex; flex-direction: column; align-items: center; text-align: center; background: ${t.heroBg}; }
+        .nfc-avatar { width: 104px; height: 104px; border-radius: 50%; border: 3px solid ${t.avatarBorder}; margin-bottom: 18px; background: rgba(0,0,0,0.25); display: flex; align-items: center; justify-content: center; font-size: 40px; font-weight: 900; color: ${t.avatarTextColor}; overflow: hidden; box-shadow: ${t.avatarGlow}; }
+        .nfc-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+        .nfc-name { font-size: 30px; font-weight: 900; ${t.nameGrad ? `background: ${t.nameGrad}; -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;` : `color: ${t.nameSolid};`} margin-bottom: 10px; line-height: 1.2; letter-spacing: -0.5px; }
+        .nfc-tagline { font-size: 15px; color: ${t.taglineColor}; margin-bottom: 6px; line-height: 1.5; }
+        .nfc-company { font-size: 13px; color: ${t.companyColor}; font-weight: 600; }
+        .nfc-links { width: 100%; padding: 8px 16px; display: flex; flex-direction: column; gap: 10px; }
+        .nfc-link-btn { display: flex; align-items: center; gap: 14px; padding: 16px 20px; border-radius: 14px; background: ${t.linkBg}; border: 1px solid ${t.linkBorder}; text-decoration: none; color: ${t.linkColor}; font-size: 15px; font-weight: 600; -webkit-tap-highlight-color: transparent; transition: all 0.15s ease; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+        .nfc-link-btn:active { transform: scale(0.97); filter: brightness(1.12); }
+        .nfc-link-icon { width: 42px; height: 42px; border-radius: 11px; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; }
+        .nfc-arrow { margin-left: auto; font-size: 16px; color: ${t.arrowColor}; }
+        .nfc-footer { margin-top: 36px; display: flex; flex-direction: column; align-items: center; gap: 8px; padding-bottom: 16px; }
+        .nfc-badge { display: inline-flex; align-items: center; gap: 6px; padding: 8px 18px; border-radius: 999px; background: ${t.badgeBg}; border: 1px solid ${t.badgeBorder}; text-decoration: none; font-size: 12px; font-weight: 700; color: ${t.badgeColor}; backdrop-filter: blur(4px); }
       `}</style>
-      <div style={{
-        minHeight:'100vh',
-        background: theme.bg,
-        fontFamily: "'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif",
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-      }}>
-        {/* Hero section */}
-        <div style={{
-          width: '100%',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          padding: '48px 20px 40px',
-          gap: '0',
-        }}>
-          {/* Ring avatar */}
-          <div className="ring-wrap">
-            <div className="ring-spin"/>
-            <div className="ring-inner">
-              {profile.avatar_url ? (
-                <img src={profile.avatar_url} alt={profile.display_name}
-                  style={{width:'100%',height:'100%',objectFit:'cover',borderRadius:'50%'}}/>
-              ) : (
-                <span className="monogram">{monogram}</span>
-              )}
-            </div>
+      <div className="nfc-container">
+        <div className="nfc-hero">
+          <div className="nfc-avatar">
+            {profile.avatar_url ? <img src={profile.avatar_url} alt={profile.display_name} /> : profile.display_name.charAt(0).toUpperCase()}
           </div>
-
-          <div style={{height:'20px'}}/>
-
-          {/* Name + tagline */}
-          <h1 className="profile-name">{profile.display_name}</h1>
-          {profile.tagline && <p className="profile-tagline">{profile.tagline}</p>}
-          {profile.company && <p className="profile-company">{profile.company}</p>}
-
+          <h1 className="nfc-name">{profile.display_name}</h1>
+          {profile.tagline && <p className="nfc-tagline">{profile.tagline}</p>}
+          {profile.company && <p className="nfc-company">🏢 {profile.company}</p>}
         </div>
 
-        {/* Thin divider */}
-        <div className="divider-line"/>
-
-        {/* Cards section */}
-        <div style={{
-          width: '100%',
-          maxWidth: '420px',
-          padding: '24px 16px 48px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '10px',
-        }}>
-          {cardLinks.map((link,i)=>(
-            <a key={i} href={link.url} target="_blank" rel="noopener noreferrer"
-              className="card-link"
-              style={{animationDelay:`${0.15+i*0.08}s`}}>
-              <BrandIcon type={link.type} color={theme.acc}/>
-              <span style={{color:textColor,fontSize:'15px',fontWeight:500,flex:1}}>{link.label}</span>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={theme.acc} strokeWidth="2" opacity="0.5">
-                <path d="M5 12h14M12 5l7 7-7 7"/>
-              </svg>
+        <div className="nfc-links">
+          {linksToRender.map((link, i) => (
+            <a
+              key={i}
+              href={link.href}
+              target={link.href.startsWith('tel:') || link.href.startsWith('mailto:') ? '_self' : '_blank'}
+              rel="noopener noreferrer"
+              className="nfc-link-btn"
+            >
+              <div className="nfc-link-icon" style={{ background: link.color + t.iconAlpha, border: `1px solid ${link.color}${t.iconBorderAlpha}` }}>
+                {link.icon}
+              </div>
+              <span>{link.label}</span>
+              <span className="nfc-arrow">→</span>
             </a>
           ))}
+        </div>
 
-          {/* Footer */}
-          <div style={{height:'16px'}}/>
-          <div className="taply-footer" style={{textAlign:'center',padding:'20px 16px'}}>
-            <p style={{
-              margin: 0,
-              fontFamily: "'Playfair Display', Georgia, serif",
-              fontSize: '13px',
-              fontStyle: 'italic',
-              color: mutedColor,
-              letterSpacing: '0.02em',
-            }}>
-              Powered by <span style={{color:theme.acc,fontStyle:'normal',fontWeight:700,fontFamily:"'DM Sans',sans-serif",letterSpacing:'1.5px',fontSize:'14px'}}>TAPLY</span>
-            </p>
-          </div>
+        <div className="nfc-footer">
+          <a href="https://taply-inventory.vercel.app" className="nfc-badge" target="_blank" rel="noopener noreferrer">
+            ⚡ Creado con Taply NFC
+          </a>
         </div>
       </div>
     </>
