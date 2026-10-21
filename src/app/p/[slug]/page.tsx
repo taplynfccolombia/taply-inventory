@@ -1,13 +1,13 @@
 import { createClient } from '@supabase/supabase-js'
 
-interface CustomLink { type: string; label: string; url: string; icon?: string }
+interface CustomLink { label: string; url: string; icon?: string }
 
 interface NFCProfile {
   id: string; slug: string; display_name: string; tagline: string | null
   company: string | null; avatar_url: string | null; whatsapp: string | null
   email: string | null; website: string | null; instagram: string | null
   tiktok: string | null; linkedin: string | null; facebook: string | null
-  youtube: string | null; custom_links: CustomLink[]; is_active: boolean
+  youtube: string | null; location: string | null; custom_links: CustomLink[]; is_active: boolean
   views: number; template: string
 }
 
@@ -50,9 +50,18 @@ function IconFacebook({color}:{color:string}){return(<svg width="22" height="22"
 function IconYouTube({color}:{color:string}){return(<svg width="22" height="22" viewBox="0 0 24 24" fill={color}><path d="M23.495 6.205a3.007 3.007 0 0 0-2.088-2.088c-1.87-.501-9.396-.501-9.396-.501s-7.507-.01-9.396.501A3.007 3.007 0 0 0 .527 6.205a31.247 31.247 0 0 0-.522 5.805 31.247 31.247 0 0 0 .522 5.783 3.007 3.007 0 0 0 2.088 2.088c1.868.502 9.396.502 9.396.502s7.506 0 9.396-.502a3.007 3.007 0 0 0 2.088-2.088 31.247 31.247 0 0 0 .5-5.783 31.247 31.247 0 0 0-.5-5.805zM9.609 15.601V8.408l6.264 3.602z"/></svg>)}
 function IconEmail({color}:{color:string}){return(<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>)}
 function IconGlobe({color}:{color:string}){return(<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>)}
-function IconPhone({color}:{color:string}){return(<svg width="22" height="22" viewBox="0 0 24 24" fill={color}><path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/></svg>)}
 function IconLink({color}:{color:string}){return(<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>)}
-
+function IconMapPin({color}:{color:string}){return(<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>)}
+function getCustomIcon(url:string):string{
+  if(/wa\.me|whatsapp/i.test(url))return'whatsapp'
+  if(/instagram/i.test(url))return'instagram'
+  if(/tiktok/i.test(url))return'tiktok'
+  if(/linkedin/i.test(url))return'linkedin'
+  if(/facebook|fb\.com/i.test(url))return'facebook'
+  if(/youtube|youtu\.be/i.test(url))return'youtube'
+  if(/^mailto/i.test(url))return'email'
+  return'link'
+}
 function BrandIcon({type,color}:{type:string;color:string}){
   if(type==='whatsapp')return<IconWhatsApp color={color}/>
   if(type==='instagram')return<IconInstagram color={color}/>
@@ -61,70 +70,9 @@ function BrandIcon({type,color}:{type:string;color:string}){
   if(type==='facebook')return<IconFacebook color={color}/>
   if(type==='youtube')return<IconYouTube color={color}/>
   if(type==='email')return<IconEmail color={color}/>
-  if(type==='website'||type==='globe')return<IconGlobe color={color}/>
-  if(type==='phone')return<IconPhone color={color}/>
+  if(type==='globe')return<IconGlobe color={color}/>
+  if(type==='location')return<IconMapPin color={color}/>
   return<IconLink color={color}/>
-}
-
-// Colombia: auto-agrega código 57 si el número no empieza con 57
-function colPhone(raw: string): string {
-  const digits = raw.replace(/\D/g, '')
-  if (digits.startsWith('57') && digits.length >= 11) return digits
-  return '57' + digits
-}
-
-// Construye la URL correcta según el tipo de enlace
-function buildLinkUrl(link: CustomLink): string {
-  const v = (link.url || '').trim()
-  switch (link.type) {
-    case 'whatsapp':
-      if (v.startsWith('http')) return v
-      return `https://wa.me/${colPhone(v)}`
-    case 'phone':
-      if (v.startsWith('tel:')) return v
-      return `tel:+${colPhone(v)}`
-    case 'email':
-      if (v.startsWith('mailto:')) return v
-      return `mailto:${v}`
-    case 'website':
-      if (v.startsWith('http')) return v
-      return `https://${v}`
-    case 'instagram':
-      if (v.startsWith('http')) return v
-      return `https://instagram.com/${v.replace(/^@/, '')}`
-    case 'tiktok':
-      if (v.startsWith('http')) return v
-      return `https://tiktok.com/@${v.replace(/^@/, '')}`
-    case 'linkedin':
-      if (v.startsWith('http')) return v
-      return `https://linkedin.com/in/${v}`
-    case 'facebook':
-      if (v.startsWith('http')) return v
-      return `https://facebook.com/${v}`
-    case 'youtube':
-      if (v.startsWith('http')) return v
-      return `https://youtube.com/@${v.replace(/^@/, '')}`
-    default:
-      if (v.startsWith('http') || v.startsWith('mailto:') || v.startsWith('tel:')) return v
-      return v ? `https://${v}` : '#'
-  }
-}
-
-// Detecta si custom_links está en el nuevo formato (tiene campo 'type')
-function isNewFormat(links: CustomLink[]): boolean {
-  return Array.isArray(links) && links.length > 0 && typeof links[0].type === 'string'
-}
-
-// Fallback: detecta plataforma por URL (para perfiles en formato antiguo)
-function getCustomIcon(url: string): string {
-  if(/wa\.me|whatsapp/i.test(url)) return 'whatsapp'
-  if(/instagram/i.test(url)) return 'instagram'
-  if(/tiktok/i.test(url)) return 'tiktok'
-  if(/linkedin/i.test(url)) return 'linkedin'
-  if(/facebook|fb\.com/i.test(url)) return 'facebook'
-  if(/youtube|youtu\.be/i.test(url)) return 'youtube'
-  if(/^mailto/i.test(url)) return 'email'
-  return 'link'
 }
 
 export default async function ProfilePage({params}:{params:Promise<{slug:string}>}){
@@ -149,36 +97,21 @@ export default async function ProfilePage({params}:{params:Promise<{slug:string}
   const cardBorder= isLight ? `${theme.acc}28` : `${theme.acc}22`
   const monogram  = profile.display_name?.charAt(0)?.toUpperCase() || 'T'
 
-  // Construir lista de links: nuevo formato → solo custom_links; antiguo → campos individuales
-  const customLinks: CustomLink[] = Array.isArray(profile.custom_links) ? profile.custom_links : []
-
-  let allLinks: {url:string;label:string;type:string}[]
-
-  if (isNewFormat(customLinks)) {
-    // NUEVO FORMATO: leer SOLO de custom_links, ignorar campos individuales (evita duplicados)
-    allLinks = customLinks
-      .filter((l: CustomLink) => l.url?.trim())
-      .map((l: CustomLink) => ({
-        url: buildLinkUrl(l),
-        label: l.label || l.type || 'Enlace',
-        type: l.type || 'custom',
-      }))
-  } else {
-    // FORMATO ANTIGUO: compatibilidad hacia atrás con campos individuales
-    allLinks = [
-      profile.whatsapp ? {url: profile.whatsapp.startsWith('http') ? profile.whatsapp : `https://wa.me/${colPhone(profile.whatsapp)}`, label:'WhatsApp', type:'whatsapp'} : null,
-      profile.instagram ? {url: profile.instagram.startsWith('http') ? profile.instagram : `https://instagram.com/${profile.instagram.replace('@','')}`, label:'Instagram', type:'instagram'} : null,
-      profile.tiktok ? {url: profile.tiktok.startsWith('http') ? profile.tiktok : `https://tiktok.com/@${profile.tiktok.replace('@','')}`, label:'TikTok', type:'tiktok'} : null,
-      profile.linkedin ? {url: profile.linkedin.startsWith('http') ? profile.linkedin : `https://linkedin.com/in/${profile.linkedin}`, label:'LinkedIn', type:'linkedin'} : null,
-      profile.facebook ? {url: profile.facebook.startsWith('http') ? profile.facebook : `https://facebook.com/${profile.facebook}`, label:'Facebook', type:'facebook'} : null,
-      profile.youtube ? {url: profile.youtube.startsWith('http') ? profile.youtube : `https://youtube.com/@${profile.youtube.replace('@','')}`, label:'YouTube', type:'youtube'} : null,
-      profile.email ? {url: `mailto:${profile.email}`, label:'Email', type:'email'} : null,
-      profile.website ? {url: profile.website.startsWith('http') ? profile.website : `https://${profile.website}`, label:'Sitio Web', type:'website'} : null,
-      ...customLinks.filter((l:CustomLink) => l.url && l.label).map((l:CustomLink) => ({url:l.url, label:l.label, type:getCustomIcon(l.url)})),
-    ].filter(Boolean) as {url:string;label:string;type:string}[]
-  }
+  const allLinks=[
+    profile.whatsapp?{url:profile.whatsapp.startsWith('http')?profile.whatsapp:`https://wa.me/${profile.whatsapp.replace(/\D/g,'')}`,label:'WhatsApp',type:'whatsapp'}:null,
+    profile.instagram?{url:profile.instagram.startsWith('http')?profile.instagram:`https://instagram.com/${profile.instagram.replace('@','')}`,label:'Instagram',type:'instagram'}:null,
+    profile.tiktok?{url:profile.tiktok.startsWith('http')?profile.tiktok:`https://tiktok.com/@${profile.tiktok.replace('@','')}`,label:'TikTok',type:'tiktok'}:null,
+    profile.linkedin?{url:profile.linkedin.startsWith('http')?profile.linkedin:`https://linkedin.com/in/${profile.linkedin}`,label:'LinkedIn',type:'linkedin'}:null,
+    profile.facebook?{url:profile.facebook.startsWith('http')?profile.facebook:`https://facebook.com/${profile.facebook}`,label:'Facebook',type:'facebook'}:null,
+    profile.youtube?{url:profile.youtube.startsWith('http')?profile.youtube:`https://youtube.com/@${profile.youtube.replace('@','')}`,label:'YouTube',type:'youtube'}:null,
+    profile.email?{url:`mailto:${profile.email}`,label:'Email',type:'email'}:null,
+    profile.website?{url:profile.website.startsWith('http')?profile.website:`https://${profile.website}`,label:'Sitio Web',type:'globe'}:null,
+    profile.location?{url:`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(profile.location)}`,label:profile.location,type:'location'}:null,
+    ...(profile.custom_links||[]).map((l:CustomLink)=>({url:l.url,label:l.label,type:getCustomIcon(l.url)})),
+  ].filter(Boolean) as {url:string;label:string;type:string}[]
 
   // Todos los links van como tarjetas completas
+  const socialLinks: typeof allLinks = []
   const cardLinks = allLinks
 
   return(
@@ -269,6 +202,36 @@ export default async function ProfilePage({params}:{params:Promise<{slug:string}
           animation-delay: 0.52s;
           opacity: 0;
         }
+        .social-row {
+          display: flex;
+          justify-content: center;
+          gap: 10px;
+          animation: fadeUp 0.45s ease both;
+          animation-delay: 0.55s;
+          opacity: 0;
+        }
+        .social-icon-btn {
+          width: 46px;
+          height: 46px;
+          border-radius: 12px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: ${cardBg};
+          border: 1px solid ${cardBorder};
+          text-decoration: none;
+          transition: transform 0.18s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.18s ease;
+          -webkit-tap-highlight-color: transparent;
+          backdrop-filter: blur(8px);
+        }
+        .social-icon-btn:hover {
+          transform: scale(1.12) translateY(-2px);
+          box-shadow: 0 6px 20px ${theme.acc}40;
+        }
+        .social-icon-btn:active {
+          transform: scale(0.94) !important;
+          transition-duration: 0.08s !important;
+        }
         .card-link {
           display: flex;
           align-items: center;
@@ -297,14 +260,6 @@ export default async function ProfilePage({params}:{params:Promise<{slug:string}
           transform: scale(0.97) !important;
           transition-duration: 0.08s !important;
           box-shadow: none !important;
-        }
-        .card-link-phone {
-          background: ${theme.acc}18;
-          border-color: ${theme.acc}44;
-        }
-        .card-link-phone:hover {
-          background: ${theme.acc}28;
-          box-shadow: 0 6px 28px ${theme.acc}50;
         }
         .taply-footer {
           animation: fadeUp 0.5s ease both;
@@ -370,22 +325,14 @@ export default async function ProfilePage({params}:{params:Promise<{slug:string}
           gap: '10px',
         }}>
           {cardLinks.map((link,i)=>(
-            <a key={i} href={link.url}
-              target={link.type === 'phone' ? '_self' : '_blank'}
-              rel="noopener noreferrer"
-              className={`card-link${link.type === 'phone' ? ' card-link-phone' : ''}`}
+            <a key={i} href={link.url} target="_blank" rel="noopener noreferrer"
+              className="card-link"
               style={{animationDelay:`${0.15+i*0.08}s`}}>
               <BrandIcon type={link.type} color={theme.acc}/>
               <span style={{color:textColor,fontSize:'15px',fontWeight:500,flex:1}}>{link.label}</span>
-              {link.type === 'phone' ? (
-                <svg width="16" height="16" viewBox="0 0 24 24" fill={theme.acc} opacity="0.7">
-                  <path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/>
-                </svg>
-              ) : (
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={theme.acc} strokeWidth="2" opacity="0.5">
-                  <path d="M5 12h14M12 5l7 7-7 7"/>
-                </svg>
-              )}
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={theme.acc} strokeWidth="2" opacity="0.5">
+                <path d="M5 12h14M12 5l7 7-7 7"/>
+              </svg>
             </a>
           ))}
 
