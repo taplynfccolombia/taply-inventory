@@ -6,7 +6,7 @@ import type { Sale } from '@/lib/supabase'
 import { PRODUCT_CONFIG } from '@/lib/supabase'
 import { formatCOP, formatDateTime, PAYMENT_METHOD_LABELS, SALE_STATUS_LABELS, exportToCSV } from '@/lib/utils'
 import { useIsMobile } from '@/lib/hooks'
-import { ShoppingCart, Plus, X, Ban, Download, Search } from 'lucide-react'
+import { ShoppingCart, Plus, X, Ban, Download, Search, Pencil, Check } from 'lucide-react'
 
 interface ClientBasic { id: string; full_name: string; company: string | null }
 
@@ -18,6 +18,9 @@ export default function VentasPage() {
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [confirmCancel, setConfirmCancel] = useState<string | null>(null)
+  const [editingSaleId, setEditingSaleId] = useState<string | null>(null)
+  const [editingPrice, setEditingPrice] = useState('')
+  const [updatingPriceId, setUpdatingPriceId] = useState<string | null>(null)
   const [cancellingId, setCancellingId] = useState<string | null>(null)
   const [stockQty, setStockQty] = useState(0)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
@@ -27,7 +30,7 @@ export default function VentasPage() {
   const [filterPayment, setFilterPayment] = useState<string>('todos')
 
   const [form, setForm] = useState({
-    client_id: '', product_type: 'essential' as 'essential' | 'custom', quantity: '1',
+    client_id: '', product_type: 'essential' as 'essential' | 'custom', quantity: '1', unit_price: '',
     payment_method: 'efectivo' as 'efectivo' | 'transferencia' | 'nequi' | 'daviplata' | 'otro',
     status: 'completada' as 'completada' | 'pendiente' | 'cancelada', notes: '',
   })
@@ -44,19 +47,35 @@ export default function VentasPage() {
   useEffect(() => { fetchData() }, [])
 
   const selectedProduct = PRODUCT_CONFIG[form.product_type]
-  const totalRevenue = selectedProduct.unit_price * Number(form.quantity)
+  const unitPrice = Number(form.unit_price)
+  const totalRevenue = unitPrice * Number(form.quantity)
   const totalCost = selectedProduct.unit_cost * Number(form.quantity)
   const totalProfit = totalRevenue - totalCost
 
   async function handleSubmit() {
     const qty = Number(form.quantity)
     if (qty <= 0) { setMessage({ type: 'error', text: 'La cantidad debe ser mayor a 0.' }); return }
+    if (!Number.isFinite(unitPrice) || unitPrice <= 0) { setMessage({ type: 'error', text: 'Ingresa un precio por tarjeta mayor a $0.' }); return }
     if (form.status === 'completada' && qty > stockQty) { setMessage({ type: 'error', text: `Stock insuficiente. Solo hay ${stockQty} unidades.` }); return }
     setSaving(true); setMessage(null)
-    const { error } = await supabase.from('sales').insert([{ client_id: form.client_id || null, product_type: form.product_type, quantity: qty, unit_price: selectedProduct.unit_price, unit_cost: selectedProduct.unit_cost, payment_method: form.payment_method, status: form.status, notes: form.notes.trim() || null }])
+    const { error } = await supabase.from('sales').insert([{ client_id: form.client_id || null, product_type: form.product_type, quantity: qty, unit_price: unitPrice, unit_cost: selectedProduct.unit_cost, payment_method: form.payment_method, status: form.status, notes: form.notes.trim() || null }])
     if (error) { setMessage({ type: 'error', text: `Error: ${error.message}` }) }
-    else { setMessage({ type: 'success', text: 'Venta registrada exitosamente.' }); setForm({ client_id: '', product_type: 'essential', quantity: '1', payment_method: 'efectivo', status: 'completada', notes: '' }); setShowForm(false); fetchData() }
+    else { setMessage({ type: 'success', text: 'Venta registrada exitosamente.' }); setForm({ client_id: '', product_type: 'essential', quantity: '1', unit_price: '', payment_method: 'efectivo', status: 'completada', notes: '' }); setShowForm(false); fetchData() }
     setSaving(false)
+  }
+
+  async function handleUpdatePrice(saleId: string) {
+    const price = Number(editingPrice)
+    if (!Number.isFinite(price) || price <= 0) { setMessage({ type: 'error', text: 'Ingresa un precio por tarjeta mayor a $0.' }); return }
+    setUpdatingPriceId(saleId); setMessage(null)
+    const { error } = await supabase.from('sales').update({ unit_price: price }).eq('id', saleId)
+    if (error) setMessage({ type: 'error', text: `No se pudo actualizar el precio: ${error.message}` })
+    else {
+      setMessage({ type: 'success', text: 'Precio de la venta actualizado.' })
+      setEditingSaleId(null); setEditingPrice('')
+      await fetchData()
+    }
+    setUpdatingPriceId(null)
   }
 
   async function handleCancel(saleId: string) {
@@ -153,6 +172,11 @@ export default function VentasPage() {
                 {Object.entries(SALE_STATUS_LABELS).map(([val, label]) => <option key={val} value={val}>{label}</option>)}
               </select>
             </div>
+          </div>
+          <div>
+            <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#9ca3af', marginBottom: '7px' }}>Precio manual por tarjeta (COP)</label>
+            <input type="number" min="1" step="1000" value={form.unit_price} onChange={e => setForm(p => ({ ...p, unit_price: e.target.value }))} placeholder="Escribe el precio acordado"
+              style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', fontSize: '14px', outline: 'none', backgroundColor: '#0d0d0d', border: '1px solid #2a2a2a', color: '#f0f0f0', boxSizing: 'border-box' }} />
           </div>
           <div>
             <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#9ca3af', marginBottom: '7px' }}>Cliente (opcional)</label>
@@ -262,6 +286,16 @@ export default function VentasPage() {
                       </td>
                       <td style={{ padding: '12px 14px' }}>
                         <div style={{ display: 'flex', gap: '5px', alignItems: 'center' }}>
+                          {editingSaleId === sale.id ? (
+                            <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                              <input aria-label="Nuevo precio por tarjeta" type="number" min="1" step="1000" value={editingPrice} onChange={e => setEditingPrice(e.target.value)}
+                                style={{ width: '110px', padding: '6px 8px', borderRadius: '7px', fontSize: '12px', backgroundColor: '#161616', border: '1px solid #2a2a2a', color: '#f0f0f0' }} />
+                              <button onClick={() => handleUpdatePrice(sale.id)} disabled={updatingPriceId === sale.id} title="Guardar precio" style={{ padding: '6px', borderRadius: '7px', cursor: 'pointer', backgroundColor: '#00ff940d', border: '1px solid #00ff9422', color: '#00ff94' }}><Check size={13} /></button>
+                              <button onClick={() => { setEditingSaleId(null); setEditingPrice('') }} title="Cancelar edición" style={{ padding: '6px', borderRadius: '7px', cursor: 'pointer', backgroundColor: 'transparent', border: '1px solid #2a2a2a', color: '#6b7280' }}><X size={13} /></button>
+                            </div>
+                          ) : (
+                            <button onClick={() => { setEditingSaleId(sale.id); setEditingPrice(String(sale.unit_price)); setMessage(null) }} title="Editar precio" style={{ padding: '5px', borderRadius: '7px', cursor: 'pointer', backgroundColor: 'transparent', border: '1px solid #1f1f1f', color: '#6b7280', display: 'flex', alignItems: 'center' }}><Pencil size={13} /></button>
+                          )}
                           {sale.status === 'pendiente' && (
                             <button onClick={() => handleMarkCompleted(sale.id)} title="Marcar cobrada"
                               style={{ padding: '5px 8px', borderRadius: '7px', cursor: 'pointer', backgroundColor: '#00ff940d', border: '1px solid #00ff9422', color: '#00ff94', fontSize: '12px', fontWeight: 700 }}>✓</button>
