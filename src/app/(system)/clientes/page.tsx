@@ -31,9 +31,26 @@ export default function ClientesPage() {
   async function handleSubmit() {
     if (!form.full_name.trim()) { setMessage({ type: 'error', text: 'El nombre es obligatorio.' }); return }
     setSaving(true); setMessage(null)
-    const { error } = await supabase.from('clients').insert([{ full_name: form.full_name.trim(), email: form.email.trim() || null, phone: form.phone.trim() || null, company: form.company.trim() || null, city: form.city.trim() || null, notes: form.notes.trim() || null }])
-    if (error) { setMessage({ type: 'error', text: 'Error al guardar.' }) }
-    else { setMessage({ type: 'success', text: 'Cliente registrado.' }); setForm({ full_name: '', email: '', phone: '', company: '', city: '', notes: '' }); setShowForm(false); fetchClients() }
+    const fullName = form.full_name.trim()
+    const { data: client, error } = await supabase.from('clients').insert([{ full_name: fullName, email: form.email.trim() || null, phone: form.phone.trim() || null, company: form.company.trim() || null, city: form.city.trim() || null, notes: form.notes.trim() || null }]).select('id').single()
+    if (error || !client) { setMessage({ type: 'error', text: `Error al guardar el cliente${error ? `: ${error.message}` : '.'}` }) }
+    else {
+      const slugBase = fullName.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9\s-]/g, '').trim().replace(/\s+/g, '-').replace(/-+/g, '-') || 'cliente'
+      const slug = `${slugBase}-${client.id.replace(/-/g, '').slice(0, 8)}`
+      const { error: profileError } = await supabase.from('nfc_profiles').insert([{
+        client_id: client.id, slug, display_name: fullName,
+        tagline: null, company: form.company.trim() || null, avatar_url: null,
+        whatsapp: null, email: null, website: null, instagram: null, tiktok: null,
+        linkedin: null, facebook: null, youtube: null, location: null, google_reviews_url: null,
+        custom_links: [], is_active: true, template: 'oscuro',
+      }])
+      setMessage(profileError
+        ? { type: 'error', text: `Cliente creado, pero no se pudo generar su perfil QR. Revisa su ficha: ${profileError.message}` }
+        : { type: 'success', text: 'Cliente registrado y perfil QR creado automáticamente.' })
+      setForm({ full_name: '', email: '', phone: '', company: '', city: '', notes: '' })
+      setShowForm(false)
+      await fetchClients()
+    }
     setSaving(false)
   }
 
