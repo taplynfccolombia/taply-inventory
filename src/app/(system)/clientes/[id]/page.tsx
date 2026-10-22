@@ -82,7 +82,7 @@ export default function ClienteDetallePage() {
   const [nfcMessage, setNfcMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [nfcForm, setNfcForm] = useState({
     slug: '', display_name: '', tagline: '', company: '', avatar_url: '',
-    is_active: true, template: 'oscuro',
+    is_active: false, template: 'oscuro',
   })
   const [customLinks, setCustomLinks] = useState<CustomLink[]>([])
   const [newLink, setNewLink] = useState({ type: '', label: '', url: '' })
@@ -131,6 +131,12 @@ export default function ClienteDetallePage() {
     }
     if (clientRes.data) {
       setEditForm({ full_name: clientRes.data.full_name ?? '', email: clientRes.data.email ?? '', phone: clientRes.data.phone ?? '', company: clientRes.data.company ?? '', city: clientRes.data.city ?? '', notes: clientRes.data.notes ?? '' })
+      if (!nfcRes.data) {
+        const clientName = clientRes.data.full_name ?? ''
+        const clientSlug = generateSlug(clientName) || 'cliente'
+        const idSuffix = String(id).replace(/-/g, '').slice(0, 8)
+        setNfcForm({ slug: `${clientSlug}-${idSuffix}`, display_name: clientName, tagline: '', company: clientRes.data.company ?? '', avatar_url: '', is_active: false, template: 'oscuro' })
+      }
     }
     setLoading(false)
   }
@@ -181,6 +187,7 @@ export default function ClienteDetallePage() {
   async function handleSaveNFC() {
     if (!nfcForm.display_name.trim()) { setNfcMessage({ type: 'error', text: 'El nombre es obligatorio.' }); return }
     if (!nfcForm.slug.trim()) { setNfcMessage({ type: 'error', text: 'El slug (URL) es obligatorio.' }); return }
+    if (nfcForm.is_active && customLinks.length === 0) { setNfcMessage({ type: 'error', text: 'Agrega al menos un enlace de contacto antes de activar el perfil.' }); return }
     const slugClean = generateSlug(nfcForm.slug)
     setSavingNFC(true); setNfcMessage(null)
     const payload = {
@@ -385,10 +392,14 @@ export default function ClienteDetallePage() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '5px 10px', borderRadius: '8px', fontSize: '11px', fontWeight: 600, backgroundColor: '#6b72800d', border: '1px solid #6b728022', color: '#6b7280' }}>
                   <Eye size={11} /> {nfcProfile.views} vistas
                 </div>
-                <a href={profileUrl!} target="_blank" rel="noopener noreferrer"
-                  style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '7px 12px', borderRadius: '9px', fontSize: '12px', fontWeight: 700, textDecoration: 'none', backgroundColor: '#00ff940d', border: '1px solid #00ff9422', color: '#00ff94' }}>
-                  <ExternalLink size={12} /> Ver perfil
-                </a>
+                {nfcProfile.is_active ? (
+                  <a href={profileUrl!} target="_blank" rel="noopener noreferrer"
+                    style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '7px 12px', borderRadius: '9px', fontSize: '12px', fontWeight: 700, textDecoration: 'none', backgroundColor: '#00ff940d', border: '1px solid #00ff9422', color: '#00ff94' }}>
+                    <ExternalLink size={12} /> Vista previa
+                  </a>
+                ) : (
+                  <span style={{ padding: '7px 10px', borderRadius: '9px', color: '#ffb547', fontSize: '11px', backgroundColor: '#ffb5470d' }}>Borrador privado</span>
+                )}
               </>
             )}
             <button onClick={() => { setShowNFCForm(!showNFCForm); setNfcMessage(null) }}

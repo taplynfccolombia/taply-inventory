@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import QRCode from 'qrcode'
-import { Download, ExternalLink, QrCode, Search, UserRound } from 'lucide-react'
+import { Clipboard, Download, ExternalLink, Printer, QrCode, RotateCw, Search, UserRound } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useIsMobile } from '@/lib/hooks'
 
@@ -23,6 +23,8 @@ export default function CodigosQRPage() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [error, setError] = useState('')
+  const [feedback, setFeedback] = useState('')
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
 
   useEffect(() => {
     let cancelled = false
@@ -75,6 +77,55 @@ export default function CodigosQRPage() {
     (client.company ?? '').toLowerCase().includes(search.toLowerCase()),
   ), [clients, search])
 
+  const printableClients = filteredClients.filter(client => client.profile?.is_active && qrImages[client.id])
+  const selectedVisibleCount = printableClients.filter(client => selectedIds.includes(client.id)).length
+
+  async function copyProfileLink(url: string) {
+    try {
+      await navigator.clipboard.writeText(url)
+      setFeedback('Enlace copiado.')
+    } catch {
+      setFeedback('No se pudo copiar el enlace. Puedes abrir el perfil y copiarlo desde el navegador.')
+    }
+  }
+
+  async function regenerateQR(client: ClientWithProfile) {
+    if (!client.profile) return
+    try {
+      const url = `${PUBLIC_PROFILE_BASE_URL}/p/${client.profile.slug}`
+      const qr = await QRCode.toDataURL(url, { width: 320, margin: 2, errorCorrectionLevel: 'H' })
+      setQrImages(current => ({ ...current, [client.id]: qr }))
+      setFeedback(`QR de ${client.full_name} regenerado.`)
+    } catch {
+      setFeedback('No se pudo generar el código QR.')
+    }
+  }
+
+  function printSelected() {
+    const selected = printableClients.filter(client => selectedIds.includes(client.id))
+    if (selected.length === 0) {
+      setFeedback('Selecciona al menos un perfil activo para imprimir.')
+      return
+    }
+    const escapeHtml = (value: string) => value.replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]!)
+    const printWindow = window.open('', '_blank', 'width=900,height=700')
+    if (!printWindow) {
+      setFeedback('Permite las ventanas emergentes para abrir la hoja de impresión.')
+      return
+    }
+    const cards = selected.map(client => `
+      <article><img src="${qrImages[client.id]}" alt="QR ${escapeHtml(client.full_name)}" />
+      <h2>${escapeHtml(client.profile!.display_name)}</h2><p>${escapeHtml(client.company ?? '')}</p>
+      <small>${escapeHtml(`${PUBLIC_PROFILE_BASE_URL}/p/${client.profile!.slug}`)}</small></article>
+    `).join('')
+    printWindow.document.open()
+    printWindow.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Códigos QR Taply</title>
+      <style>body{font-family:Arial,sans-serif;margin:20px;color:#111}.sheet{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}article{border:1px solid #ccc;border-radius:10px;padding:14px;text-align:center;break-inside:avoid}img{width:170px;height:170px}h2{font-size:16px;margin:8px 0 4px}p{font-size:12px;margin:0 0 6px}small{font-size:9px;word-break:break-all}@media print{body{margin:8mm}.sheet{gap:8mm}}</style>
+      </head><body><main class="sheet">${cards}</main></body></html>`)
+    printWindow.document.close()
+    window.setTimeout(() => printWindow.print(), 500)
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       <div>
@@ -82,6 +133,20 @@ export default function CodigosQRPage() {
         <p style={{ margin: '4px 0 0', fontSize: '13px', color: '#6b7280' }}>
           Cada código abre el perfil público del cliente. Los clientes nuevos reciben su QR automáticamente.
         </p>
+      </div>
+
+      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+        <button onClick={() => setSelectedIds(selectedVisibleCount === printableClients.length
+          ? selectedIds.filter(id => !printableClients.some(client => client.id === id))
+          : [...new Set([...selectedIds, ...printableClients.map(client => client.id)])])} disabled={printableClients.length === 0}
+          style={{ padding: '9px 12px', borderRadius: '9px', border: '1px solid #2a2a2a', backgroundColor: 'transparent', color: '#9ca3af', cursor: printableClients.length ? 'pointer' : 'not-allowed', fontSize: '12px', fontWeight: 600 }}>
+          {selectedVisibleCount === printableClients.length && printableClients.length ? 'Quitar selección' : 'Seleccionar todos'}
+        </button>
+        <button onClick={printSelected} disabled={selectedIds.filter(id => printableClients.some(client => client.id === id)).length === 0}
+          style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '9px 12px', borderRadius: '9px', border: 'none', backgroundColor: '#00cfff', color: '#0d0d0d', cursor: 'pointer', fontSize: '12px', fontWeight: 700 }}>
+          <Printer size={14} /> Imprimir seleccionados
+        </button>
+        {feedback && <span role="status" style={{ fontSize: '12px', color: '#00ff94' }}>{feedback}</span>}
       </div>
 
       <div style={{ position: 'relative' }}>
@@ -119,18 +184,26 @@ export default function CodigosQRPage() {
 
                 {profile && qrImage ? (
                   <>
+                    {profile.is_active && (
+                      <label style={{ alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: '7px', color: '#9ca3af', fontSize: '12px' }}>
+                        <input type="checkbox" checked={selectedIds.includes(client.id)} onChange={event => setSelectedIds(current => event.target.checked ? [...new Set([...current, client.id])] : current.filter(id => id !== client.id))} />
+                        Incluir en impresión
+                      </label>
+                    )}
                     <div style={{ width: '190px', height: '190px', padding: '10px', borderRadius: '12px', backgroundColor: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      {/* QR is generated locally from the same public profile URL shown below. */}
                       <img src={qrImage} alt={`Código QR del perfil de ${client.full_name}`} width="170" height="170" style={{ display: 'block', width: '100%', height: '100%' }} />
                     </div>
                     <span style={{ padding: '4px 10px', borderRadius: '999px', fontSize: '11px', fontWeight: 700, color: profile.is_active ? '#00ff94' : '#ffb547', backgroundColor: profile.is_active ? '#00ff940d' : '#ffb5470d' }}>
                       {profile.is_active ? 'Perfil activo' : 'Perfil inactivo'}
                     </span>
-                    <div style={{ width: '100%', display: 'flex', gap: '8px' }}>
-                      <a href={qrImage} download={`taply-${profile.slug}-qr.png`} style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', padding: '9px 10px', borderRadius: '9px', textDecoration: 'none', fontSize: '12px', fontWeight: 700, background: 'linear-gradient(90deg, #00cfff, #00ff94)', color: '#0d0d0d' }}>
-                        <Download size={14} /> Descargar PNG
-                      </a>
-                      <a href={profileUrl!} target="_blank" rel="noreferrer" title="Abrir perfil" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '9px 11px', borderRadius: '9px', color: '#00cfff', border: '1px solid #00cfff33', textDecoration: 'none' }}><ExternalLink size={15} /></a>
+                    {!profile.is_active && <p style={{ margin: 0, color: '#ffb547', fontSize: '12px', textAlign: 'center' }}>QR en borrador. Activa el perfil al terminar de configurarlo.</p>}
+                    <div style={{ width: '100%', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                      <button onClick={() => regenerateQR(client)} style={{ flex: '1 1 40%', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', padding: '9px 10px', borderRadius: '9px', textDecoration: 'none', fontSize: '12px', fontWeight: 700, backgroundColor: '#0d0d0d', color: '#00cfff', border: '1px solid #00cfff33', cursor: 'pointer' }}>
+                        <RotateCw size={14} /> Regenerar
+                      </button>
+                      {profile.is_active && <a href={qrImage} download={`taply-${profile.slug}-qr.png`} style={{ flex: '1 1 45%', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', padding: '9px 10px', borderRadius: '9px', textDecoration: 'none', fontSize: '12px', fontWeight: 700, background: 'linear-gradient(90deg, #00cfff, #00ff94)', color: '#0d0d0d' }}><Download size={14} /> Descargar PNG</a>}
+                      {profile.is_active && <button onClick={() => copyProfileLink(profileUrl!)} title="Copiar enlace del perfil" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '9px 11px', borderRadius: '9px', color: '#00cfff', border: '1px solid #00cfff33', background: 'transparent', cursor: 'pointer' }}><Clipboard size={15} /></button>}
+                      {profile.is_active && <a href={profileUrl!} target="_blank" rel="noreferrer" title="Vista previa del perfil" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '9px 11px', borderRadius: '9px', color: '#00cfff', border: '1px solid #00cfff33', textDecoration: 'none' }}><ExternalLink size={15} /></a>}
                     </div>
                     <Link href={`/clientes/${client.id}`} style={{ color: '#6b7280', fontSize: '12px', textDecoration: 'none' }}>Administrar perfil</Link>
                   </>

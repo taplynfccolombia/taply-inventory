@@ -20,6 +20,7 @@ export default function VentasPage() {
   const [confirmCancel, setConfirmCancel] = useState<string | null>(null)
   const [editingSaleId, setEditingSaleId] = useState<string | null>(null)
   const [editingPrice, setEditingPrice] = useState('')
+  const [pendingPriceChange, setPendingPriceChange] = useState<{ sale: Sale; price: number } | null>(null)
   const [updatingPriceId, setUpdatingPriceId] = useState<string | null>(null)
   const [cancellingId, setCancellingId] = useState<string | null>(null)
   const [stockQty, setStockQty] = useState(0)
@@ -64,18 +65,38 @@ export default function VentasPage() {
     setSaving(false)
   }
 
-  async function handleUpdatePrice(saleId: string) {
+  function requestPriceUpdate(sale: Sale) {
     const price = Number(editingPrice)
     if (!Number.isFinite(price) || price <= 0) { setMessage({ type: 'error', text: 'Ingresa un precio por tarjeta mayor a $0.' }); return }
-    setUpdatingPriceId(saleId); setMessage(null)
-    const { error } = await supabase.from('sales').update({ unit_price: price }).eq('id', saleId)
-    if (error) setMessage({ type: 'error', text: `No se pudo actualizar el precio: ${error.message}` })
-    else {
-      setMessage({ type: 'success', text: 'Precio de la venta actualizado.' })
-      setEditingSaleId(null); setEditingPrice('')
-      await fetchData()
+    if (price === Number(sale.unit_price)) { setEditingSaleId(null); setEditingPrice(''); return }
+    setPendingPriceChange({ sale, price })
+    setEditingSaleId(null)
+  }
+
+  async function handleUpdatePrice() {
+    if (!pendingPriceChange) return
+    const { sale, price } = pendingPriceChange
+    setUpdatingPriceId(sale.id); setMessage(null)
+    const { data, error } = await supabase.from('sales').update({ unit_price: price }).eq('id', sale.id)
+      .select('unit_price, total_revenue, total_cost, total_profit').single()
+    if (error || !data) {
+      setMessage({ type: 'error', text: `No se pudo actualizar el precio: ${error?.message ?? 'No se recibió la venta actualizada.'}` })
+    } else {
+      const expectedRevenue = price * Number(sale.quantity)
+      const expectedProfit = expectedRevenue - Number(data.total_cost)
+      const totalsUpdated = Math.abs(Number(data.total_revenue) - expectedRevenue) < 0.01 && Math.abs(Number(data.total_profit) - expectedProfit) < 0.01
+      if (!totalsUpdated) {
+        const { error: rollbackError } = await supabase.from('sales').update({ unit_price: sale.unit_price }).eq('id', sale.id)
+        setMessage({ type: 'error', text: rollbackError
+          ? 'El precio cambió, pero los totales no se recalcularon y no se pudo revertir. Revisa esta venta antes de continuar.'
+          : 'El precio no se guardó: la base de datos no recalculó ingreso y ganancia. No se aplicó el cambio.' })
+        if (!rollbackError) await fetchData()
+      } else {
+        setMessage({ type: 'success', text: `Precio actualizado. Ingreso: ${formatCOP(expectedRevenue)} · Ganancia: ${formatCOP(expectedProfit)}. Los reportes y el flujo de caja usan estos totales.` })
+        await fetchData()
+      }
     }
-    setUpdatingPriceId(null)
+    setUpdatingPriceId(null); setPendingPriceChange(null); setEditingPrice('')
   }
 
   async function handleCancel(saleId: string) {
@@ -106,7 +127,7 @@ export default function VentasPage() {
   const totalFilteredProfit = filteredSales.filter(s => s.status === 'completada').reduce((acc, s) => acc + Number(s.total_profit), 0)
 
   function handleExportCSV() {
-    exportToCSV(filteredSales.map(s => ({ Fecha: formatDateTime(s.sale_date), Producto: PRODUCT_CONFIG[s.product_type].label, Cliente: (s.client as unknown as ClientBasic)?.full_name ?? '—', Cantidad: s.quantity, 'Ingreso (COP)': s.total_revenue, 'Costo (COP)': s.total_cost, 'Ganancia (COP)': s.total_profit, 'Método de Pago': PAYMENT_METHOD_LABELS[s.payment_method], Estado: SALE_STATUS_LABELS[s.status], Notas: s.notes ?? '' })), 'Taply_Ventas')
+    exportToCSV(filteredSales.map(s => ({ Fecha: formatDateTime(s.sale_date), Producto: PRODUCT_CONFIG[s.product_type].label, Cliente: (s.client as unknown as ClientBasic)?.full_name ?? '—', Cantidad: s.quantity, 'Precio unitario (COP)': s.unit_price, 'Ingreso (COP)': s.total_revenue, 'Costo (COP)': s.total_cost, 'Ganancia (COP)': s.total_profit, 'Método de Pago': PAYMENT_METHOD_LABELS[s.payment_method], Estado: SALE_STATUS_LABELS[s.status], Notas: s.notes ?? '' })), 'Taply_Ventas')
   }
 
   return (
@@ -211,6 +232,27 @@ export default function VentasPage() {
 
       {message && !showForm && <div style={{ padding: '10px 14px', borderRadius: '8px', fontSize: '13px', backgroundColor: message.type === 'success' ? '#00ff940d' : '#ff4d4d0d', border: `1px solid ${message.type === 'success' ? '#00ff9422' : '#ff4d4d22'}`, color: message.type === 'success' ? '#00ff94' : '#ff4d4d' }}>{message.text}</div>}
 
+      {pendingPriceChange && (
+        <div role="dialog" aria-modal="true" aria-labelledby="price-confirm-title" style={{ position: 'fixed', inset: 0, zIndex: 100, backgroundColor: '#000b', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <div style={{ width: '100%', maxWidth: '420px', padding: '22px', borderRadius: '16px', backgroundColor: '#161616', border: '1px solid #2a2a2a' }}>
+            <h2 id="price-confirm-title" style={{ margin: '0 0 10px', color: '#f0f0f0', fontSize: '17px' }}>Confirmar cambio de precio</h2>
+            <p style={{ margin: '0 0 8px', color: '#9ca3af', fontSize: '13px' }}>{PRODUCT_CONFIG[pendingPriceChange.sale.product_type].label} · {pendingPriceChange.sale.quantity} unidad(es)</p>
+            <p style={{ margin: '0 0 14px', color: '#f0f0f0', fontSize: '13px' }}>
+              {formatCOP(Number(pendingPriceChange.sale.unit_price))} → {formatCOP(pendingPriceChange.price)} por tarjeta
+            </p>
+            <div style={{ padding: '12px', marginBottom: '16px', borderRadius: '10px', backgroundColor: '#0d0d0d', color: '#9ca3af', fontSize: '12px', lineHeight: 1.6 }}>
+              Ingreso total: {formatCOP(Number(pendingPriceChange.sale.total_revenue))} → {formatCOP(pendingPriceChange.price * Number(pendingPriceChange.sale.quantity))}<br />
+              La aplicación verificará el recálculo antes de actualizar reportes y flujo de caja.
+            </div>
+            {updatingPriceId === pendingPriceChange.sale.id && <p style={{ margin: '0 0 12px', color: '#00cfff', fontSize: '12px' }}>Verificando los totales...</p>}
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button onClick={handleUpdatePrice} disabled={updatingPriceId === pendingPriceChange.sale.id} style={{ flex: 1, padding: '10px', borderRadius: '9px', border: 'none', background: 'linear-gradient(90deg, #00cfff, #00ff94)', color: '#0d0d0d', fontWeight: 700, cursor: 'pointer' }}>Confirmar</button>
+              <button onClick={() => { setPendingPriceChange(null); setEditingPrice('') }} disabled={updatingPriceId === pendingPriceChange.sale.id} style={{ padding: '10px 14px', borderRadius: '9px', border: '1px solid #2a2a2a', background: 'transparent', color: '#9ca3af', fontWeight: 600, cursor: 'pointer' }}>Cancelar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Tabs */}
       <div style={{ display: 'flex', gap: '4px', padding: '4px', borderRadius: '10px', backgroundColor: '#161616', border: '1px solid #1f1f1f', alignSelf: 'flex-start' }}>
         {([['todas', 'Todas'], ['pendientes', `Pendientes${pendingSales.length > 0 ? ` (${pendingSales.length})` : ''}`]] as const).map(([tab, label]) => (
@@ -253,18 +295,18 @@ export default function VentasPage() {
       {/* Tabla con scroll horizontal */}
       <div style={{ borderRadius: '16px', overflow: 'hidden', border: '1px solid #1f1f1f' }}>
         <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', minWidth: isMobile ? '600px' : 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', minWidth: isMobile ? '760px' : 'auto' }}>
             <thead>
               <tr style={{ backgroundColor: '#161616', borderBottom: '1px solid #1f1f1f' }}>
-                {['Fecha', 'Producto', 'Cliente', 'Cant.', 'Ingreso', 'Ganancia', 'Pago', 'Estado', ''].map((h, i) => (
+                {['Fecha', 'Producto', 'Cliente', 'Cant.', 'Precio/u', 'Ingreso', 'Ganancia', 'Pago', 'Estado', ''].map((h, i) => (
                   <th key={i} style={{ textAlign: 'left', padding: '12px 14px', fontWeight: 600, color: '#6b7280', whiteSpace: 'nowrap' }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {loading ? [...Array(3)].map((_, i) => <tr key={i}>{[...Array(9)].map((_, j) => <td key={j} style={{ padding: '12px 14px' }}><div style={{ height: '14px', borderRadius: '6px', backgroundColor: '#1f1f1f' }} /></td>)}</tr>)
+              {loading ? [...Array(3)].map((_, i) => <tr key={i}>{[...Array(10)].map((_, j) => <td key={j} style={{ padding: '12px 14px' }}><div style={{ height: '14px', borderRadius: '6px', backgroundColor: '#1f1f1f' }} /></td>)}</tr>)
                 : filteredSales.length === 0 ? (
-                  <tr><td colSpan={9} style={{ padding: '40px', textAlign: 'center', color: '#4b5563' }}>
+                  <tr><td colSpan={10} style={{ padding: '40px', textAlign: 'center', color: '#4b5563' }}>
                     <ShoppingCart size={28} style={{ margin: '0 auto 10px', display: 'block', opacity: 0.3 }} />
                     {activeTab === 'pendientes' ? '¡No hay cobros pendientes!' : 'Sin ventas registradas.'}
                   </td></tr>
@@ -276,6 +318,7 @@ export default function VentasPage() {
                       <td style={{ padding: '12px 14px', fontWeight: 600, color: '#00cfff', whiteSpace: 'nowrap' }}>{PRODUCT_CONFIG[sale.product_type].label}</td>
                       <td style={{ padding: '12px 14px', color: '#9ca3af', whiteSpace: 'nowrap' }}>{clientData?.full_name ?? '—'}</td>
                       <td style={{ padding: '12px 14px', textAlign: 'center', color: '#f0f0f0' }}>{sale.quantity}</td>
+                      <td style={{ padding: '12px 14px', color: '#9ca3af', whiteSpace: 'nowrap' }}>{formatCOP(Number(sale.unit_price))}</td>
                       <td style={{ padding: '12px 14px', fontWeight: 600, color: '#00cfff', whiteSpace: 'nowrap' }}>{formatCOP(sale.total_revenue)}</td>
                       <td style={{ padding: '12px 14px', fontWeight: 600, color: '#00ff94', whiteSpace: 'nowrap' }}>{formatCOP(sale.total_profit)}</td>
                       <td style={{ padding: '12px 14px', color: '#9ca3af', whiteSpace: 'nowrap' }}>{PAYMENT_METHOD_LABELS[sale.payment_method]}</td>
@@ -290,7 +333,7 @@ export default function VentasPage() {
                             <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
                               <input aria-label="Nuevo precio por tarjeta" type="number" min="1" step="1000" value={editingPrice} onChange={e => setEditingPrice(e.target.value)}
                                 style={{ width: '110px', padding: '6px 8px', borderRadius: '7px', fontSize: '12px', backgroundColor: '#161616', border: '1px solid #2a2a2a', color: '#f0f0f0' }} />
-                              <button onClick={() => handleUpdatePrice(sale.id)} disabled={updatingPriceId === sale.id} title="Guardar precio" style={{ padding: '6px', borderRadius: '7px', cursor: 'pointer', backgroundColor: '#00ff940d', border: '1px solid #00ff9422', color: '#00ff94' }}><Check size={13} /></button>
+                              <button onClick={() => requestPriceUpdate(sale)} title="Revisar y guardar precio" style={{ padding: '6px', borderRadius: '7px', cursor: 'pointer', backgroundColor: '#00ff940d', border: '1px solid #00ff9422', color: '#00ff94' }}><Check size={13} /></button>
                               <button onClick={() => { setEditingSaleId(null); setEditingPrice('') }} title="Cancelar edición" style={{ padding: '6px', borderRadius: '7px', cursor: 'pointer', backgroundColor: 'transparent', border: '1px solid #2a2a2a', color: '#6b7280' }}><X size={13} /></button>
                             </div>
                           ) : (

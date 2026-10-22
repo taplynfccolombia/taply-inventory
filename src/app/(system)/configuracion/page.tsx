@@ -1,13 +1,25 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { logout, changePassword, getPasswordStatus } from '@/lib/auth'
 import { useRouter } from 'next/navigation'
-import { AlertTriangle, Trash2, Shield, Info, LogOut, KeyRound, Eye, EyeOff } from 'lucide-react'
+import { AlertTriangle, Trash2, Shield, Info, LogOut, KeyRound, Eye, EyeOff, Download, Upload, Database } from 'lucide-react'
 import { useIsMobile } from '@/lib/hooks'
 
 type ResetStep = 'idle' | 'confirm1' | 'confirm2' | 'resetting' | 'done' | 'error'
+
+interface AppBackup {
+  app: 'taply-inventory'
+  formatVersion: 1
+  exportedAt: string
+  tables: {
+    clients: Record<string, unknown>[]
+    nfc_profiles: Record<string, unknown>[]
+    sales: Record<string, unknown>[]
+    inventory: Record<string, unknown>[]
+  }
+}
 
 export default function ConfiguracionPage() {
   const router = useRouter()
@@ -22,6 +34,12 @@ export default function ConfiguracionPage() {
   const [showPwd, setShowPwd] = useState(false)
   const [showLogout, setShowLogout] = useState(false)
   const [passwordStatus, setPasswordStatus] = useState<{ isDefault: boolean; expiryDate: Date | null } | null>(null)
+  const backupInputRef = useRef<HTMLInputElement>(null)
+  const [backupBusy, setBackupBusy] = useState(false)
+  const [backupMessage, setBackupMessage] = useState('')
+  const [backupError, setBackupError] = useState('')
+  const [backupPreview, setBackupPreview] = useState<{ fileName: string; archive: AppBackup } | null>(null)
+  const [backupConfirmText, setBackupConfirmText] = useState('')
 
   useEffect(() => {
     setPasswordStatus(getPasswordStatus())
@@ -50,6 +68,109 @@ export default function ConfiguracionPage() {
     } catch (err: unknown) {
       setErrorMsg(err instanceof Error ? err.message : 'Error desconocido')
       setResetStep('error')
+    }
+  }
+
+  async function handleDownloadBackup() {
+    setBackupBusy(true); setBackupError(''); setBackupMessage('')
+    try {
+      const [clients, profiles, sales, inventory] = await Promise.all([
+        supabase.from('clients').select('*'),
+        supabase.from('nfc_profiles').select('*'),
+        supabase.from('sales').select('*'),
+        supabase.from('inventory').select('*'),
+      ])
+      if (clients.error) throw new Error(`Clientes: ${clients.error.message}`)
+      if (profiles.error) throw new Error(`Perfiles NFC: ${profiles.error.message}`)
+      if (sales.error) throw new Error(`Ventas: ${sales.error.message}`)
+      if (inventory.error) throw new Error(`Inventario: ${inventory.error.message}`)
+      const archive: AppBackup = {
+        app: 'taply-inventory', formatVersion: 1, exportedAt: new Date().toISOString(),
+        tables: { clients: clients.data ?? [], nfc_profiles: profiles.data ?? [], sales: sales.data ?? [], inventory: inventory.data ?? [] },
+      }
+      const blob = new Blob([JSON.stringify(archive, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = `taply-respaldo-${new Date().toISOString().slice(0, 10)}.json`
+      anchor.click()
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+      setBackupMessage(`Respaldo descargado: ${archive.tables.clients.length} clientes, ${archive.tables.nfc_profiles.length} perfiles QR, ${archive.tables.sales.length} ventas e inventario.`)
+    } catch (err) {
+      setBackupError(err instanceof Error ? err.message : 'No se pudo crear el respaldo.')
+    } finally {
+      setBackupBusy(false)
+    }
+  }
+
+  async function handleBackupFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    setBackupError(''); setBackupMessage(''); setBackupPreview(null); setBackupConfirmText('')
+    if (!file) return
+    try {
+      if (file.size > 50 * 1024 * 1024) throw new Error('El archivo supera el límite de 50 MB.')
+      const parsed = JSON.parse(await file.text()) as Partial<AppBackup>
+      const tables = parsed.tables
+      if (parsed.app !== 'taply-inventory' || parsed.formatVersion !== 1 || !tables || !Array.isArray(tables.clients) || !Array.isArray(tables.nfc_profiles) || !Array.isArray(tables.sales) || !Array.isArray(tables.inventory)) {
+        throw new Error('El archivo no es un respaldo Taply compatible.')
+      }
+      const hasValidIds = (rows: Record<string, unknown>[]) => rows.every(row => row && typeof row === 'object' && typeof row.id === 'string')
+      if (!hasValidIds(tables.clients) || !hasValidIds(tables.nfc_profiles) || !hasValidIds(tables.sales) || !hasValidIds(tables.inventory)) {
+        throw new Error('El respaldo contiene registros sin identificador válido.')
+      }
+      if (!tables.clients.every(row => typeof row.full_name === 'string') ||
+          !tables.sales.every(row => typeof row.unit_price === 'number' && typeof row.quantity === 'number' && typeof row.total_revenue === 'number' && typeof row.total_cost === 'number' && typeof row.total_profit === 'number') ||
+          !tables.inventory.every(row => typeof row.item_name === 'string')) {
+        throw new Error('El respaldo contiene registros incompletos o de un formato no compatible.')
+      }
+      setBackupPreview({ fileName: file.name, archive: parsed as AppBackup })
+    } catch (err) {
+      setBackupError(err instanceof Error ? err.message : 'No se pudo leer el archivo.')
+    }
+  }
+
+  async function handleRestoreBackup() {
+    if (!backupPreview || backupConfirmText !== 'RESTAURAR') return
+    setBackupBusy(true); setBackupError(''); setBackupMessage('')
+    const { tables } = backupPreview.archive
+    try {
+      for (let offset = 0; offset < tables.clients.length; offset += 300) {
+        const { error } = await supabase.from('clients').upsert(tables.clients.slice(offset, offset + 300) as never[], { onConflict: 'id' })
+        if (error) throw new Error(`Clientes: ${error.message}`)
+      }
+      for (let offset = 0; offset < tables.nfc_profiles.length; offset += 300) {
+        const { error } = await supabase.from('nfc_profiles').upsert(tables.nfc_profiles.slice(offset, offset + 300) as never[], { onConflict: 'id' })
+        if (error) throw new Error(`Perfiles QR: ${error.message}`)
+      }
+      for (let offset = 0; offset < tables.sales.length; offset += 300) {
+        const batch = tables.sales.slice(offset, offset + 300)
+        const writableBatch = batch.map(row => Object.fromEntries(Object.entries(row).filter(([key]) => !['total_revenue', 'total_cost', 'total_profit'].includes(key))))
+        const { error } = await supabase.from('sales').upsert(writableBatch as never[], { onConflict: 'id' })
+        if (error) throw new Error(`Ventas: ${error.message}`)
+        const { data: restoredSales, error: totalsError } = await supabase.from('sales').select('id, total_revenue, total_cost, total_profit').in('id', batch.map(row => String(row.id)))
+        if (totalsError) throw new Error(`Verificación de ventas: ${totalsError.message}`)
+        const expectedById = new Map(batch.map(row => [String(row.id), row]))
+        const totalsMatch = (restoredSales ?? []).every(sale => {
+          const expected = expectedById.get(String(sale.id))
+          return expected && Math.abs(Number(sale.total_revenue) - Number(expected.total_revenue)) < 0.01 &&
+            Math.abs(Number(sale.total_cost) - Number(expected.total_cost)) < 0.01 &&
+            Math.abs(Number(sale.total_profit) - Number(expected.total_profit)) < 0.01
+        })
+        if (!totalsMatch || (restoredSales ?? []).length !== batch.length) {
+          throw new Error('Los totales de una o más ventas no coinciden con el respaldo. La restauración se detuvo.')
+        }
+      }
+      for (let offset = 0; offset < tables.inventory.length; offset += 300) {
+        const { error } = await supabase.from('inventory').upsert(tables.inventory.slice(offset, offset + 300) as never[], { onConflict: 'id' })
+        if (error) throw new Error(`Inventario: ${error.message}`)
+      }
+      setBackupMessage('Respaldo restaurado. Los registros con el mismo ID se actualizaron; los demás datos actuales se conservaron.')
+      setBackupPreview(null); setBackupConfirmText('')
+    } catch (err) {
+      setBackupError(`La restauración se detuvo y puede haber aplicado algunos registros. ${err instanceof Error ? err.message : ''}`)
+    } finally {
+      setBackupBusy(false)
     }
   }
 
@@ -100,6 +221,51 @@ export default function ConfiguracionPage() {
             </div>
           ))}
         </div>
+      </div>
+
+      {/* Respaldo */}
+      <div style={{ borderRadius: '16px', padding: '24px', backgroundColor: '#161616', border: '1px solid #1f1f1f' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+          <Database size={18} style={{ color: '#00cfff' }} />
+          <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#f0f0f0' }}>Respaldo y restauración</h2>
+        </div>
+        <p style={{ margin: '0 0 16px', fontSize: '12px', lineHeight: 1.6, color: '#6b7280' }}>
+          Exporta clientes, perfiles QR, ventas e inventario en un archivo JSON. Al restaurarlo, los registros con el mismo ID se reemplazan por la copia y los demás datos actuales se conservan. El archivo contiene datos personales y financieros; guárdalo en un lugar privado.
+        </p>
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+          <button onClick={handleDownloadBackup} disabled={backupBusy}
+            style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '10px 14px', borderRadius: '10px', border: 'none', background: 'linear-gradient(90deg, #00cfff, #00ff94)', color: '#0d0d0d', cursor: backupBusy ? 'wait' : 'pointer', fontSize: '13px', fontWeight: 700 }}>
+            <Download size={15} /> {backupBusy ? 'Procesando...' : 'Descargar respaldo'}
+          </button>
+          <button onClick={() => backupInputRef.current?.click()} disabled={backupBusy}
+            style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '10px 14px', borderRadius: '10px', border: '1px solid #2a2a2a', background: 'transparent', color: '#9ca3af', cursor: backupBusy ? 'wait' : 'pointer', fontSize: '13px', fontWeight: 700 }}>
+            <Upload size={15} /> Elegir respaldo para restaurar
+          </button>
+          <input ref={backupInputRef} type="file" accept=".json,application/json" onChange={handleBackupFile} style={{ display: 'none' }} />
+        </div>
+
+        {backupMessage && <p role="status" style={{ margin: '14px 0 0', color: '#00ff94', fontSize: '12px' }}>{backupMessage}</p>}
+        {backupError && <p role="alert" style={{ margin: '14px 0 0', color: '#ff4d4d', fontSize: '12px' }}>{backupError}</p>}
+
+        {backupPreview && (
+          <div style={{ marginTop: '16px', padding: '16px', borderRadius: '12px', backgroundColor: '#0d0d0d', border: '1px solid #ffb54733' }}>
+            <p style={{ margin: '0 0 8px', color: '#ffb547', fontSize: '13px', fontWeight: 700 }}>Confirma la restauración de {backupPreview.fileName}</p>
+            <p style={{ margin: '0 0 12px', color: '#9ca3af', fontSize: '12px' }}>
+              {backupPreview.archive.tables.clients.length} clientes · {backupPreview.archive.tables.nfc_profiles.length} perfiles QR · {backupPreview.archive.tables.sales.length} ventas · {backupPreview.archive.tables.inventory.length} registros de inventario. Puede reemplazar registros actuales con el mismo ID.
+            </p>
+            <label style={{ display: 'block', marginBottom: '6px', color: '#9ca3af', fontSize: '12px' }}>Escribe RESTAURAR para confirmar</label>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <input value={backupConfirmText} onChange={event => setBackupConfirmText(event.target.value)} placeholder="RESTAURAR"
+                style={{ flex: '1 1 180px', padding: '10px 12px', borderRadius: '9px', border: '1px solid #2a2a2a', backgroundColor: '#161616', color: '#f0f0f0', outline: 'none' }} />
+              <button onClick={handleRestoreBackup} disabled={backupBusy || backupConfirmText !== 'RESTAURAR'}
+                style={{ padding: '10px 14px', borderRadius: '9px', border: 'none', backgroundColor: backupConfirmText === 'RESTAURAR' ? '#ffb547' : '#2a2a2a', color: backupConfirmText === 'RESTAURAR' ? '#0d0d0d' : '#6b7280', cursor: backupConfirmText === 'RESTAURAR' ? 'pointer' : 'not-allowed', fontSize: '12px', fontWeight: 700 }}>
+                {backupBusy ? 'Restaurando...' : 'Restaurar respaldo'}
+              </button>
+              <button onClick={() => { setBackupPreview(null); setBackupConfirmText('') }} disabled={backupBusy}
+                style={{ padding: '10px 14px', borderRadius: '9px', border: '1px solid #2a2a2a', background: 'transparent', color: '#9ca3af', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>Cancelar</button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Seguridad */}

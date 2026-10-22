@@ -42,7 +42,7 @@ export default function ClientesPage() {
         tagline: null, company: form.company.trim() || null, avatar_url: null,
         whatsapp: null, email: null, website: null, instagram: null, tiktok: null,
         linkedin: null, facebook: null, youtube: null, location: null, google_reviews_url: null,
-        custom_links: [], is_active: true, template: 'oscuro',
+        custom_links: [], is_active: false, template: 'oscuro',
       }])
       setMessage(profileError
         ? { type: 'error', text: `Cliente creado, pero no se pudo generar su perfil QR. Revisa su ficha: ${profileError.message}` }
