@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Download, BookOpen, LayoutDashboard, ShoppingCart, Package, Users, Wallet, CheckSquare, Sparkles, Megaphone, FileText, Truck, Settings, MessageCircle, Shield, ChevronDown, ChevronUp } from 'lucide-react'
+import { Download, BookOpen, LayoutDashboard, ShoppingCart, Package, Users, Wallet, CheckSquare, FileText, Truck, Settings, MessageCircle, Shield, ChevronDown, ChevronUp } from 'lucide-react'
 import { useIsMobile } from '@/lib/hooks'
 
 const SECTIONS = [
@@ -257,62 +257,6 @@ FILTROS:
 ALERTAS:
 - Las tareas vencidas aparecen con badge rojo "⚠ Vencida"
 - El header muestra el contador de urgentes y vencidas`,
-  },
-  {
-    id: 'contenido', icon: Sparkles, color: '#00cfff',
-    title: 'Contenido — Ideas para redes sociales',
-    content: `Genera ideas semanales con guiones detallados para Instagram y TikTok.
-
-GENERAR IDEAS:
-- Click en "✨ Generar Ideas" para el plan de la semana
-- 7 ideas (una por día): Reel, Story, Carrusel, TikTok
-- Click en "🎲 Nuevas Ideas" para regenerar
-
-NAVEGAR ENTRE SEMANAS:
-- Botones "← Anterior" y "Siguiente →"
-- Badge "Esta semana" marca la semana actual
-
-VER EL GUIÓN:
-- Click en "✨ Ver guión" en cualquier tarjeta
-- Incluye: hook, desarrollo con planos, CTA, música, tips faceless
-- Botón "📋 Copiar guión" para copiarlo
-
-EN MÓVIL:
-- Las tarjetas son deslizables horizontalmente
-- Desliza con el dedo para ver los 7 días
-
-MARCAR COMO PUBLICADO:
-- Click en el checkbox de cada tarjeta
-- La tarjeta se atenúa al publicarse
-- Contador "X/7 publicados" en el header de semana`,
-  },
-  {
-    id: 'ads', icon: Megaphone, color: '#ff4d4d',
-    title: 'ADS — Pautas Meta y TikTok',
-    content: `Generador de anuncios profesionales y guías de pauta.
-
-SELECCIONAR PLATAFORMA:
-- 📘 Meta Ads (Facebook + Instagram)
-- 🎵 TikTok Ads
-
-⚡ GENERADOR DE ANUNCIOS:
-1. Selecciona producto, objetivo, presupuesto y duración
-2. Define ubicación y rango de edad
-3. Click "Generar Anuncio"
-
-EL GENERADOR PRODUCE:
-- Análisis de tu configuración con advertencias
-- Copy completo: titular, texto principal, descripción, CTA
-- Audiencia recomendada con intereses específicos
-- Distribución del presupuesto en 3 fases
-- KPIs a vigilar con valores objetivo para Colombia
-- Tips de optimización
-- Botones "Copiar" para cada sección
-
-📚 GUÍA PROFESIONAL:
-- 4 secciones expandibles por plataforma
-- Estructura de campaña, públicos, presupuestos y creatividades
-- Específica para Taply NFC en Colombia`,
   },
   {
     id: 'reportes', icon: FileText, color: '#00cfff',
