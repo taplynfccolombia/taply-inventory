@@ -70,7 +70,7 @@ META MENSUAL:
 GRÁFICAS:
 - Área: ingresos y ganancias de los últimos 7 días
 - Barras: ventas por día
-- Pie chart: distribución Essential vs Custom`,
+- Pie chart: distribución de tarjetas vendidas`,
   },
   {
     id: 'ventas', icon: ShoppingCart, color: '#00cfff',
@@ -79,7 +79,7 @@ GRÁFICAS:
 
 REGISTRAR UNA VENTA:
 1. Click en "Nueva Venta"
-2. Selecciona el producto: Essential ($100.000) o Custom ($130.000)
+2. Define el precio acordado y costo unitario manualmente
 3. Ingresa la cantidad
 4. Asigna un cliente (opcional)
 5. Selecciona el método de pago
@@ -106,8 +106,7 @@ CANCELAR UNA VENTA:
 
 BÚSQUEDA Y FILTROS:
 - Busca por cliente, producto o notas
-- Filtra por producto (Essential / Custom)
-- Filtra por método de pago
+- Filtra por método de pago o búsqueda
 - El CSV exporta solo los resultados filtrados
 
 EXPORTAR CSV:
@@ -195,7 +194,7 @@ EDITAR UN CLIENTE:
 
 EN EL PERFIL DEL CLIENTE:
 - Total comprado, ganancia generada, compras completadas
-- Desglose Essential vs Custom
+- Desglose de tarjetas compradas
 - Botón "Seguimiento" → WhatsApp con mensaje post-venta
 - Historial de compras con opción de cancelar y notificar por WhatsApp
 

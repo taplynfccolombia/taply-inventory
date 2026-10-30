@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { formatCOP, formatDate, formatDateTime } from '@/lib/utils'
+import { formatCOP, formatDate } from '@/lib/utils'
 import { useIsMobile } from '@/lib/hooks'
 import { FileText, Download, Calendar, TrendingUp, ShoppingCart, DollarSign, Package } from 'lucide-react'
 
@@ -72,7 +72,16 @@ export default function ReportesPage() {
 
       let y = 60
       doc.setFontSize(13); doc.setFont('helvetica', 'bold'); doc.setTextColor(...dark); doc.text('Resumen del Período', margin, y); y += 8
-      autoTable(doc, { startY: y, head: [['Indicador', 'Valor']], body: [['Ingresos Totales', formatCOP(data.summary.totalRevenue)], ['Costo Total', formatCOP(data.summary.totalCost)], ['Ganancia Neta', formatCOP(data.summary.totalProfit)], ['Ventas Completadas', String(data.summary.totalSales)], ['Taply Essential', data.summary.essentialSales + ' uds'], ['Taply Custom', data.summary.customSales + ' uds'], ['Balance de Caja', formatCOP(data.summary.balance)]], margin: { left: margin, right: margin }, styles: { fontSize: 10, cellPadding: 4 }, headStyles: { fillColor: dark, textColor: white, fontStyle: 'bold' }, alternateRowStyles: { fillColor: [248, 248, 248] }, columnStyles: { 1: { fontStyle: 'bold', halign: 'right' } } })
+      const summaryBody: (string | number)[][] = [
+        ['Ingresos Totales', formatCOP(data.summary.totalRevenue)],
+        ['Costo Total', formatCOP(data.summary.totalCost)],
+        ['Ganancia Neta', formatCOP(data.summary.totalProfit)],
+        ['Ventas Completadas', String(data.summary.totalSales)],
+        ['Taply Custom', data.summary.customSales + ' uds'],
+        ...(data.summary.essentialSales > 0 ? [['Taply Essential (Histórico)', data.summary.essentialSales + ' uds']] : []),
+        ['Balance de Caja', formatCOP(data.summary.balance)],
+      ]
+      autoTable(doc, { startY: y, head: [['Indicador', 'Valor']], body: summaryBody, margin: { left: margin, right: margin }, styles: { fontSize: 10, cellPadding: 4 }, headStyles: { fillColor: dark, textColor: white, fontStyle: 'bold' }, alternateRowStyles: { fillColor: [248, 248, 248] }, columnStyles: { 1: { fontStyle: 'bold', halign: 'right' } } })
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       y = (doc as any).lastAutoTable.finalY + 12
 
@@ -189,7 +198,7 @@ export default function ReportesPage() {
           {!preview && !loading && (
             <div style={{ textAlign: 'center', padding: '40px 16px' }}>
               <FileText size={36} style={{ margin: '0 auto 14px', display: 'block', color: '#374151' }} />
-              <p style={{ margin: 0, fontSize: '13px', color: '#4b5563' }}>Click en "Vista previa" para ver el resumen</p>
+              <p style={{ margin: 0, fontSize: '13px', color: '#4b5563' }}>Click en &quot;Vista previa&quot; para ver el resumen</p>
             </div>
           )}
 
@@ -220,16 +229,18 @@ export default function ReportesPage() {
               </div>
 
               <div style={{ padding: '14px', borderRadius: '10px', backgroundColor: '#0d0d0d', border: '1px solid #1f1f1f' }}>
-                <p style={{ margin: '0 0 10px', fontSize: '12px', fontWeight: 700, color: '#9ca3af' }}>Desglose por producto</p>
+                <p style={{ margin: '0 0 10px', fontSize: '12px', fontWeight: 700, color: '#9ca3af' }}>Tarjetas vendidas</p>
                 <div style={{ display: 'flex', justifyContent: 'space-around' }}>
                   <div style={{ textAlign: 'center' }}>
-                    <p style={{ margin: 0, fontSize: '22px', fontWeight: 900, color: '#00cfff' }}>{margin.essentialSales}</p>
-                    <p style={{ margin: '3px 0 0', fontSize: '11px', color: '#6b7280' }}>Essential</p>
-                  </div>
-                  <div style={{ textAlign: 'center' }}>
                     <p style={{ margin: 0, fontSize: '22px', fontWeight: 900, color: '#00ff94' }}>{margin.customSales}</p>
-                    <p style={{ margin: '3px 0 0', fontSize: '11px', color: '#6b7280' }}>Custom</p>
+                    <p style={{ margin: '3px 0 0', fontSize: '11px', color: '#6b7280' }}>Taply Custom</p>
                   </div>
+                  {margin.essentialSales > 0 && (
+                    <div style={{ textAlign: 'center' }}>
+                      <p style={{ margin: 0, fontSize: '22px', fontWeight: 900, color: '#00cfff' }}>{margin.essentialSales}</p>
+                      <p style={{ margin: '3px 0 0', fontSize: '11px', color: '#6b7280' }}>Essential (Histórico)</p>
+                    </div>
+                  )}
                   <div style={{ textAlign: 'center' }}>
                     <p style={{ margin: 0, fontSize: '22px', fontWeight: 900, color: '#f0f0f0' }}>{preview.sales.length}</p>
                     <p style={{ margin: '3px 0 0', fontSize: '11px', color: '#6b7280' }}>Total</p>

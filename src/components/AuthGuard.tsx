@@ -9,6 +9,7 @@ import { Navbar } from './Navbar'
 export function AuthGuard({ children }: { children: React.ReactNode }) {
   const [authenticated, setAuthenticated] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [submitting, setSubmitting] = useState(false)
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -17,6 +18,24 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     setAuthenticated(checkAuth())
     setLoading(false)
   }, [])
+
+  async function handleLogin() {
+    if (!password.trim() || submitting) return
+    setSubmitting(true)
+    setError('')
+    try {
+      const ok = await login(password)
+      if (ok) {
+        setAuthenticated(true)
+      } else {
+        setError('Contraseña incorrecta.')
+      }
+    } catch {
+      setError('Error al autenticar.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
 
   if (loading) return (
     <div style={{ minHeight: '100vh', backgroundColor: '#0d0d0d', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -38,7 +57,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
                 type={showPassword ? 'text' : 'password'}
                 value={password}
                 onChange={e => { setPassword(e.target.value); setError('') }}
-                onKeyDown={e => { if (e.key === 'Enter') { if (login(password)) { setAuthenticated(true) } else { setError('Contraseña incorrecta.') } } }}
+                onKeyDown={e => { if (e.key === 'Enter') handleLogin() }}
                 placeholder="Contraseña"
                 autoFocus
                 style={{ width: '100%', padding: '14px 44px 14px 16px', borderRadius: '12px', fontSize: '16px', outline: 'none', backgroundColor: '#0d0d0d', border: error ? '1px solid #ff4d4d' : '1px solid #2a2a2a', color: '#f0f0f0', boxSizing: 'border-box' }} />
@@ -49,9 +68,10 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
             </div>
             {error && <p style={{ margin: 0, fontSize: '13px', color: '#ff4d4d', textAlign: 'center' }}>{error}</p>}
             <button
-              onClick={() => { if (login(password)) { setAuthenticated(true) } else { setError('Contraseña incorrecta.') } }}
-              style={{ padding: '14px', borderRadius: '12px', fontWeight: 800, fontSize: '15px', border: 'none', background: 'linear-gradient(90deg, #00cfff, #00ff94)', color: '#0d0d0d', cursor: 'pointer' }}>
-              Entrar
+              onClick={handleLogin}
+              disabled={submitting}
+              style={{ padding: '14px', borderRadius: '12px', fontWeight: 800, fontSize: '15px', border: 'none', background: submitting ? '#2a2a2a' : 'linear-gradient(90deg, #00cfff, #00ff94)', color: submitting ? '#6b7280' : '#0d0d0d', cursor: submitting ? 'not-allowed' : 'pointer' }}>
+              {submitting ? 'Verificando...' : 'Entrar'}
             </button>
           </div>
         </div>

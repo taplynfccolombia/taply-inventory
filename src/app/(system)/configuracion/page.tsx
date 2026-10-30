@@ -56,8 +56,6 @@ export default function ConfiguracionPage() {
       if (e3) throw new Error(`Clientes: ${e3.message}`)
       const { error: e4 } = await supabase.from('tasks').delete().neq('id', '00000000-0000-0000-0000-000000000000')
       if (e4) throw new Error(`Tareas: ${e4.message}`)
-      const { error: e5 } = await supabase.from('content_board').delete().neq('id', '00000000-0000-0000-0000-000000000000')
-      if (e5) throw new Error(`Contenido: ${e5.message}`)
       const { error: e6 } = await supabase.from('goals').delete().neq('id', '00000000-0000-0000-0000-000000000000')
       if (e6) throw new Error(`Metas: ${e6.message}`)
       const { error: e7 } = await supabase.from('nfc_profiles').delete().neq('id', '00000000-0000-0000-0000-000000000000')

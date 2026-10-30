@@ -249,7 +249,8 @@ export default function ClienteDetallePage() {
   const customCount = completedSales.filter(s => s.product_type === 'custom').length
   const pendingCount = sales.filter(s => s.status === 'pendiente').length
   const pendingRevenue = sales.filter(s => s.status === 'pendiente').reduce((acc, s) => acc + Number(s.total_revenue), 0)
-  const profileUrl = nfcProfile ? `https://taply-inventory.vercel.app/p/${nfcProfile.slug}` : null
+  const appBaseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://taply-inventory.vercel.app'
+  const profileUrl = nfcProfile ? `${appBaseUrl}/p/${nfcProfile.slug}` : null
   const selectedPlatformOpt = PLATFORM_OPTIONS.find(p => p.type === newLink.type)
 
   if (loading) return (
@@ -360,8 +361,11 @@ export default function ClienteDetallePage() {
 
       {/* Desglose */}
       {completedSales.length > 0 && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-          {[{ label: 'Taply Essential', count: essentialCount, color: '#00cfff', bg: '#00cfff0d', border: '#00cfff22' }, { label: 'Taply Custom', count: customCount, color: '#00ff94', bg: '#00ff940d', border: '#00ff9422' }].map(({ label, count, color, bg, border }) => (
+        <div style={{ display: 'grid', gridTemplateColumns: essentialCount > 0 ? '1fr 1fr' : '1fr', gap: '10px' }}>
+          {[
+            { label: 'Taply Custom', count: customCount, color: '#00ff94', bg: '#00ff940d', border: '#00ff9422' },
+            ...(essentialCount > 0 ? [{ label: 'Taply Essential (Histórico)', count: essentialCount, color: '#00cfff', bg: '#00cfff0d', border: '#00cfff22' }] : []),
+          ].map(({ label, count, color, bg, border }) => (
             <div key={label} style={{ borderRadius: '12px', padding: '14px 16px', backgroundColor: bg, border: `1px solid ${border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <span style={{ fontSize: '13px', fontWeight: 600, color: '#f0f0f0' }}>{label}</span>
               <span style={{ fontSize: '24px', fontWeight: 900, color }}>{count}</span>
@@ -382,7 +386,7 @@ export default function ClienteDetallePage() {
             <div>
               <h2 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: '#f0f0f0' }}>Perfil NFC</h2>
               <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#6b7280' }}>
-                {nfcProfile ? `taply-inventory.vercel.app/p/${nfcProfile.slug}` : 'Sin perfil configurado'}
+                {nfcProfile ? `${appBaseUrl.replace(/^https?:\/\//, '')}/p/${nfcProfile.slug}` : 'Sin perfil configurado'}
               </p>
             </div>
           </div>
@@ -529,6 +533,7 @@ export default function ClienteDetallePage() {
                       <input type="text" value={newLink.url}
                         onChange={e => setNewLink(p => ({ ...p, url: e.target.value }))}
                         placeholder={selectedPlatformOpt.placeholder}
+                        onKeyDown={e => e.key === 'Enter' && addLink()}
                         style={{ width: '100%', padding: '9px 11px', borderRadius: '9px', fontSize: '12px', outline: 'none', backgroundColor: '#0d0d0d', border: '1px solid #00cfff44', color: '#f0f0f0', boxSizing: 'border-box' }} />
                     </div>
                     <div>
@@ -536,6 +541,7 @@ export default function ClienteDetallePage() {
                       <input type="text" value={newLink.label}
                         onChange={e => setNewLink(p => ({ ...p, label: e.target.value }))}
                         placeholder={selectedPlatformOpt.defaultLabel}
+                        onKeyDown={e => e.key === 'Enter' && addLink()}
                         style={{ width: '100%', padding: '9px 11px', borderRadius: '9px', fontSize: '12px', outline: 'none', backgroundColor: '#0d0d0d', border: '1px solid #2a2a2a', color: '#f0f0f0', boxSizing: 'border-box' }} />
                     </div>
                   </div>

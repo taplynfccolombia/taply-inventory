@@ -137,7 +137,7 @@ export function MonthlyGoal({ currentRevenue, currentSales }: MonthlyGoalProps) 
       {!goal && !editing && (
         <div style={{ textAlign: 'center', padding: '24px', borderRadius: '12px', backgroundColor: '#0d0d0d', border: '1px dashed #2a2a2a' }}>
           <p style={{ margin: 0, fontSize: '14px', color: '#4b5563' }}>
-            No hay meta definida para este mes. Click en "Definir meta" para comenzar.
+            No hay meta definida para este mes. Click en &quot;Definir meta&quot; para comenzar.
           </p>
         </div>
       )}

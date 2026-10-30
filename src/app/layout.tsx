@@ -11,6 +11,7 @@ export const metadata: Metadata = {
     title: 'Taply',
   },
   icons: {
+    icon: '/icon.svg',
     apple: '/icon-192.png',
   },
 }

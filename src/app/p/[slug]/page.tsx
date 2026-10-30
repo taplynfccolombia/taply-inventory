@@ -284,7 +284,7 @@ export default function ProfilePage() {
         </div>
 
         <div className="nfc-footer">
-          <a href="https://taply-inventory.vercel.app" className="nfc-badge" target="_blank" rel="noopener noreferrer">
+          <a href={process.env.NEXT_PUBLIC_APP_URL || 'https://taply.co'} className="nfc-badge" target="_blank" rel="noopener noreferrer">
             ⚡ Creado con Taply NFC
           </a>
         </div>

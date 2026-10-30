@@ -34,6 +34,10 @@ export default function DashboardPage() {
   const [totalSales, setTotalSales] = useState(0)
   const [essentialCount, setEssentialCount] = useState(0)
   const [customCount, setCustomCount] = useState(0)
+  const [customRevenue, setCustomRevenue] = useState(0)
+  const [customProfit, setCustomProfit] = useState(0)
+  const [essentialRevenue, setEssentialRevenue] = useState(0)
+  const [essentialProfit, setEssentialProfit] = useState(0)
   const [dailyData, setDailyData] = useState<DailyData[]>([])
   const [pendingCount, setPendingCount] = useState(0)
   const [pendingRevenue, setPendingRevenue] = useState(0)
@@ -73,8 +77,14 @@ export default function DashboardPage() {
     const rev = sales.reduce((acc, s) => acc + Number(s.total_revenue), 0)
     const prof = sales.reduce((acc, s) => acc + Number(s.total_profit), 0)
     setTotalRevenue(rev); setTotalProfit(prof); setTotalSales(sales.length)
-    setEssentialCount(sales.filter(s => s.product_type === 'essential').length)
-    setCustomCount(sales.filter(s => s.product_type === 'custom').length)
+    const customSales = sales.filter(s => s.product_type === 'custom')
+    const essentialSales = sales.filter(s => s.product_type === 'essential')
+    setEssentialCount(essentialSales.length)
+    setCustomCount(customSales.length)
+    setCustomRevenue(customSales.reduce((acc, s) => acc + Number(s.total_revenue), 0))
+    setCustomProfit(customSales.reduce((acc, s) => acc + Number(s.total_profit), 0))
+    setEssentialRevenue(essentialSales.reduce((acc, s) => acc + Number(s.total_revenue), 0))
+    setEssentialProfit(essentialSales.reduce((acc, s) => acc + Number(s.total_profit), 0))
     setStockQty(inventoryRes.data?.quantity ?? 0)
     setTotalClients(clientsRes.count ?? 0)
     const pending = pendingRes.data ?? []
@@ -97,7 +107,10 @@ export default function DashboardPage() {
 
   const PERIOD_LABELS: Record<Period, string> = { week: 'Esta semana', month: 'Este mes', all: 'Todo el tiempo' }
   const PREV_LABELS: Record<Period, string> = { week: 'sem. pasada', month: 'mes pasado', all: '' }
-  const pieData = [{ name: 'Essential', value: essentialCount, color: '#00cfff' }, { name: 'Custom', value: customCount, color: '#00ff94' }].filter(d => d.value > 0)
+  const pieData = [
+    { name: 'Custom', value: customCount, color: '#00ff94' },
+    ...(essentialCount > 0 ? [{ name: 'Essential', value: essentialCount, color: '#00cfff' }] : []),
+  ].filter(d => d.value > 0)
   const stockStatus = stockQty === 0 ? 'sin_stock' : stockQty < 5 ? 'bajo' : 'ok'
   const stockColor = stockStatus === 'sin_stock' ? '#ff4d4d' : stockStatus === 'bajo' ? '#ffb547' : '#00ff94'
 
@@ -214,7 +227,7 @@ export default function DashboardPage() {
         </div>
 
         <div style={{ borderRadius: '16px', padding: '20px', backgroundColor: '#161616', border: '1px solid #1f1f1f' }}>
-          <h3 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: 700, color: '#f0f0f0' }}>Essential vs Custom</h3>
+          <h3 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: 700, color: '#f0f0f0' }}>Tarjetas Vendidas</h3>
           {loading || pieData.length === 0 ? (
             <div style={{ height: '140px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <p style={{ color: '#374151', fontSize: '13px' }}>Sin datos</p>
@@ -261,10 +274,10 @@ export default function DashboardPage() {
       </div>
 
       {/* Desglose */}
-      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '14px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile || essentialCount === 0 ? '1fr' : '1fr 1fr', gap: '14px' }}>
         {[
-          { label: 'Taply Essential', count: essentialCount, revenue: essentialCount * 100000, profit: essentialCount * 98000, color: '#00cfff', bg: '#00cfff0d', border: '#00cfff22' },
-          { label: 'Taply Custom', count: customCount, revenue: customCount * 130000, profit: customCount * 108800, color: '#00ff94', bg: '#00ff940d', border: '#00ff9422' },
+          { label: 'Taply Custom', count: customCount, revenue: customRevenue, profit: customProfit, color: '#00ff94', bg: '#00ff940d', border: '#00ff9422' },
+          ...(essentialCount > 0 ? [{ label: 'Taply Essential (Histórico)', count: essentialCount, revenue: essentialRevenue, profit: essentialProfit, color: '#00cfff', bg: '#00cfff0d', border: '#00cfff22' }] : []),
         ].map(({ label, count, revenue, profit, color, bg, border }) => (
           <div key={label} style={{ borderRadius: '14px', padding: '18px 20px', backgroundColor: bg, border: `1px solid ${border}` }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>

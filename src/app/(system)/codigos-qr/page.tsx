@@ -7,7 +7,7 @@ import { Clipboard, Download, ExternalLink, QrCode, RotateCw, Search, UserRound 
 import { supabase } from '@/lib/supabase'
 import { useIsMobile } from '@/lib/hooks'
 
-const PUBLIC_PROFILE_BASE_URL = 'https://taply-inventory.vercel.app'
+const PUBLIC_PROFILE_BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://taply-inventory.vercel.app'
 
 interface ClientWithProfile {
   id: string

@@ -10,10 +10,17 @@ export function TaplyLogo({ size = 'md', showText = true }: TaplyLogoProps) {
     lg: { icon: 64, text: 'text-4xl' },
   }
 
-  const { icon, text } = dimensions[size]
+  const fontSizes = {
+    sm: '18px',
+    md: '24px',
+    lg: '36px',
+  }
+
+  const { icon } = dimensions[size]
+  const fontSize = fontSizes[size]
 
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex items-center gap-3" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
       {/* Ícono SVG extraído del logo Taply */}
       <svg
         width={icon}
@@ -76,7 +83,8 @@ export function TaplyLogo({ size = 'md', showText = true }: TaplyLogoProps) {
       {/* Texto TAPLY con gradiente */}
       {showText && (
         <span
-          className={`font-black tracking-widest ${text} taply-gradient-text`}
+          className="taply-gradient-text"
+          style={{ fontWeight: 900, letterSpacing: '0.15em', fontSize }}
         >
           TAPLY
         </span>

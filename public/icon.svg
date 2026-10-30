@@ -1,0 +1,18 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="512" height="512" fill="#0d0d0d"/>
+  <defs>
+    <linearGradient id="taplyGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00cfff" />
+      <stop offset="100%" stop-color="#00ff94" />
+    </linearGradient>
+  </defs>
+  <g transform="translate(106, 106) scale(1.5)">
+    <rect x="20" y="18" width="160" height="38" rx="19" fill="url(#taplyGrad)" />
+    <rect x="88" y="56" width="24" height="80" rx="12" fill="url(#taplyGrad)" />
+    <circle cx="100" cy="155" r="12" fill="url(#taplyGrad)" />
+    <path d="M72 95 Q58 108 58 122" stroke="url(#taplyGrad)" stroke-width="7" stroke-linecap="round" fill="none" />
+    <path d="M60 82 Q38 100 38 122" stroke="url(#taplyGrad)" stroke-width="7" stroke-linecap="round" fill="none" opacity="0.6" />
+    <path d="M128 95 Q142 108 142 122" stroke="url(#taplyGrad)" stroke-width="7" stroke-linecap="round" fill="none" />
+    <path d="M140 82 Q162 100 162 122" stroke="url(#taplyGrad)" stroke-width="7" stroke-linecap="round" fill="none" opacity="0.6" />
+  </g>
+</svg>

@@ -12,7 +12,21 @@ function getPassword(): string {
   }
 }
 
-export function login(password: string): boolean {
+export async function login(password: string): Promise<boolean> {
+  try {
+    const res = await fetch('/api/auth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password }),
+    })
+    if (res.ok) {
+      const expiry = Date.now() + SESSION_DURATION
+      localStorage.setItem(AUTH_KEY, 'true')
+      localStorage.setItem(AUTH_EXPIRY_KEY, String(expiry))
+      return true
+    }
+  } catch {}
+
   if (password === getPassword()) {
     try {
       const expiry = Date.now() + SESSION_DURATION

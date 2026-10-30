@@ -7,7 +7,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 // ── Tipos del sistema Taply ──────────────────────────────────────
 
-export type ProductType = 'essential' | 'custom'
+export type ProductType = 'custom' | 'essential'
 export type PaymentMethod = 'efectivo' | 'transferencia' | 'nequi' | 'daviplata' | 'otro'
 export type SaleStatus = 'completada' | 'pendiente' | 'cancelada'
 export type CashFlowType = 'ingreso' | 'egreso'
@@ -68,14 +68,14 @@ export interface CashFlow {
 // ── Precios y costos de productos ────────────────────────────────
 
 export const PRODUCT_CONFIG = {
-  essential: {
-    label: 'Taply Essential',
-    unit_price: 100000,
-    unit_cost: 2000,
-  },
   custom: {
     label: 'Taply Custom',
     unit_price: 130000,
     unit_cost: 21200,
+  },
+  essential: {
+    label: 'Taply Essential',
+    unit_price: 100000,
+    unit_cost: 2000,
   },
 } as const

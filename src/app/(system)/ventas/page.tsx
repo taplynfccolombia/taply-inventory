@@ -27,13 +27,18 @@ export default function VentasPage() {
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [activeTab, setActiveTab] = useState<'todas' | 'pendientes'>('todas')
   const [search, setSearch] = useState('')
-  const [filterProduct, setFilterProduct] = useState<'todos' | 'essential' | 'custom'>('todos')
+  const [filterProduct, setFilterProduct] = useState<'todos' | 'custom' | 'essential'>('todos')
   const [filterPayment, setFilterPayment] = useState<string>('todos')
 
   const [form, setForm] = useState({
-    client_id: '', product_type: 'essential' as 'essential' | 'custom', quantity: '1', unit_price: '',
+    client_id: '',
+    product_type: 'custom' as 'custom' | 'essential',
+    quantity: '1',
+    unit_price: '',
+    unit_cost: '21200',
     payment_method: 'efectivo' as 'efectivo' | 'transferencia' | 'nequi' | 'daviplata' | 'otro',
-    status: 'completada' as 'completada' | 'pendiente' | 'cancelada', notes: '',
+    status: 'completada' as 'completada' | 'pendiente' | 'cancelada',
+    notes: '',
   })
 
   async function fetchData() {
@@ -47,21 +52,38 @@ export default function VentasPage() {
 
   useEffect(() => { fetchData() }, [])
 
-  const selectedProduct = PRODUCT_CONFIG[form.product_type]
-  const unitPrice = Number(form.unit_price)
-  const totalRevenue = unitPrice * Number(form.quantity)
-  const totalCost = selectedProduct.unit_cost * Number(form.quantity)
+  const unitPrice = Number(form.unit_price) || 0
+  const unitCost = Number(form.unit_cost) || 0
+  const qty = Number(form.quantity) || 0
+  const totalRevenue = unitPrice * qty
+  const totalCost = unitCost * qty
   const totalProfit = totalRevenue - totalCost
 
   async function handleSubmit() {
-    const qty = Number(form.quantity)
     if (qty <= 0) { setMessage({ type: 'error', text: 'La cantidad debe ser mayor a 0.' }); return }
     if (!Number.isFinite(unitPrice) || unitPrice <= 0) { setMessage({ type: 'error', text: 'Ingresa un precio por tarjeta mayor a $0.' }); return }
     if (form.status === 'completada' && qty > stockQty) { setMessage({ type: 'error', text: `Stock insuficiente. Solo hay ${stockQty} unidades.` }); return }
     setSaving(true); setMessage(null)
-    const { error } = await supabase.from('sales').insert([{ client_id: form.client_id || null, product_type: form.product_type, quantity: qty, unit_price: unitPrice, unit_cost: selectedProduct.unit_cost, payment_method: form.payment_method, status: form.status, notes: form.notes.trim() || null }])
+    const { error } = await supabase.from('sales').insert([{
+      client_id: form.client_id || null,
+      product_type: 'custom',
+      quantity: qty,
+      unit_price: unitPrice,
+      unit_cost: unitCost,
+      total_revenue: totalRevenue,
+      total_cost: totalCost,
+      total_profit: totalProfit,
+      payment_method: form.payment_method,
+      status: form.status,
+      notes: form.notes.trim() || null,
+    }])
     if (error) { setMessage({ type: 'error', text: `Error: ${error.message}` }) }
-    else { setMessage({ type: 'success', text: 'Venta registrada exitosamente.' }); setForm({ client_id: '', product_type: 'essential', quantity: '1', unit_price: '', payment_method: 'efectivo', status: 'completada', notes: '' }); setShowForm(false); fetchData() }
+    else {
+      setMessage({ type: 'success', text: 'Venta registrada exitosamente.' })
+      setForm({ client_id: '', product_type: 'custom', quantity: '1', unit_price: '', unit_cost: '21200', payment_method: 'efectivo', status: 'completada', notes: '' })
+      setShowForm(false)
+      fetchData()
+    }
     setSaving(false)
   }
 
@@ -169,16 +191,12 @@ export default function VentasPage() {
       {showForm && (
         <div style={{ borderRadius: '16px', padding: '20px', backgroundColor: '#161616', border: '1px solid #1f1f1f', display: 'flex', flexDirection: 'column', gap: '14px' }}>
           <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#f0f0f0' }}>Nueva Venta</h2>
-          <div>
-            <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#9ca3af', marginBottom: '7px' }}>Producto</label>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              {(['essential', 'custom'] as const).map(type => (
-                <button key={type} onClick={() => setForm(p => ({ ...p, product_type: type }))}
-                  style={{ flex: 1, padding: '10px', borderRadius: '10px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', backgroundColor: form.product_type === type ? '#00cfff0d' : '#0d0d0d', border: form.product_type === type ? '1px solid #00cfff33' : '1px solid #2a2a2a', color: form.product_type === type ? '#00cfff' : '#6b7280' }}>
-                  {PRODUCT_CONFIG[type].label}
-                </button>
-              ))}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderRadius: '10px', backgroundColor: '#0d0d0d', border: '1px solid #00cfff33' }}>
+            <div>
+              <span style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.08em', color: '#6b7280', display: 'block' }}>Producto</span>
+              <span style={{ fontSize: '14px', fontWeight: 800, color: '#00cfff' }}>Taply Custom</span>
             </div>
+            <span style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '999px', backgroundColor: '#00cfff15', color: '#00cfff', fontWeight: 700 }}>NFC</span>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
             <div>
@@ -194,10 +212,17 @@ export default function VentasPage() {
               </select>
             </div>
           </div>
-          <div>
-            <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#9ca3af', marginBottom: '7px' }}>Precio manual por tarjeta (COP)</label>
-            <input type="number" min="1" step="1000" value={form.unit_price} onChange={e => setForm(p => ({ ...p, unit_price: e.target.value }))} placeholder="Escribe el precio acordado"
-              style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', fontSize: '14px', outline: 'none', backgroundColor: '#0d0d0d', border: '1px solid #2a2a2a', color: '#f0f0f0', boxSizing: 'border-box' }} />
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#9ca3af', marginBottom: '7px' }}>Precio venta/tarjeta (COP)</label>
+              <input type="number" min="1" step="1000" value={form.unit_price} onChange={e => setForm(p => ({ ...p, unit_price: e.target.value }))} placeholder="ej: 130000"
+                style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', fontSize: '14px', outline: 'none', backgroundColor: '#0d0d0d', border: '1px solid #2a2a2a', color: '#f0f0f0', boxSizing: 'border-box' }} />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#9ca3af', marginBottom: '7px' }}>Costo/tarjeta (COP)</label>
+              <input type="number" min="0" step="500" value={form.unit_cost} onChange={e => setForm(p => ({ ...p, unit_cost: e.target.value }))} placeholder="ej: 21200"
+                style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', fontSize: '14px', outline: 'none', backgroundColor: '#0d0d0d', border: '1px solid #2a2a2a', color: '#f0f0f0', boxSizing: 'border-box' }} />
+            </div>
           </div>
           <div>
             <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#9ca3af', marginBottom: '7px' }}>Cliente (opcional)</label>
@@ -272,9 +297,9 @@ export default function VentasPage() {
         </div>
         <select value={filterProduct} onChange={e => setFilterProduct(e.target.value as typeof filterProduct)}
           style={{ padding: '9px 12px', borderRadius: '10px', fontSize: '13px', outline: 'none', backgroundColor: '#161616', border: '1px solid #1f1f1f', color: '#f0f0f0' }}>
-          <option value="todos">Todos</option>
-          <option value="essential">Essential</option>
-          <option value="custom">Custom</option>
+          <option value="todos">Todos los productos</option>
+          <option value="custom">Taply Custom</option>
+          <option value="essential">Essential (Histórico)</option>
         </select>
         <select value={filterPayment} onChange={e => setFilterPayment(e.target.value)}
           style={{ padding: '9px 12px', borderRadius: '10px', fontSize: '13px', outline: 'none', backgroundColor: '#161616', border: '1px solid #1f1f1f', color: '#f0f0f0' }}>
