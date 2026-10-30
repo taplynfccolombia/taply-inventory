@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
-import { logout, changePassword, getPasswordStatus } from '@/lib/auth'
+import { logout, changePassword } from '@/lib/auth'
 import { useRouter } from 'next/navigation'
 import { AlertTriangle, Trash2, Shield, Info, LogOut, KeyRound, Eye, EyeOff, Download, Upload, Database } from 'lucide-react'
 import { useIsMobile } from '@/lib/hooks'
@@ -33,7 +33,7 @@ export default function ConfiguracionPage() {
   const [pwdSuccess, setPwdSuccess] = useState('')
   const [showPwd, setShowPwd] = useState(false)
   const [showLogout, setShowLogout] = useState(false)
-  const [passwordStatus, setPasswordStatus] = useState<{ isDefault: boolean; expiryDate: Date | null } | null>(null)
+  const [userEmail, setUserEmail] = useState<string>('')
   const backupInputRef = useRef<HTMLInputElement>(null)
   const [backupBusy, setBackupBusy] = useState(false)
   const [backupMessage, setBackupMessage] = useState('')
@@ -42,7 +42,9 @@ export default function ConfiguracionPage() {
   const [backupConfirmText, setBackupConfirmText] = useState('')
 
   useEffect(() => {
-    setPasswordStatus(getPasswordStatus())
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user?.email) setUserEmail(user.email)
+    })
   }, [])
 
   async function handleReset() {
@@ -172,20 +174,20 @@ export default function ConfiguracionPage() {
     }
   }
 
-  function handleChangePassword(e: React.FormEvent) {
+  async function handleChangePassword(e: React.FormEvent) {
     e.preventDefault()
     setPwdError(''); setPwdSuccess('')
+    if (pwdForm.newPass.length < 6) { setPwdError('La nueva contraseña debe tener al menos 6 caracteres.'); return }
     if (pwdForm.newPass !== pwdForm.confirm) { setPwdError('Las contraseñas nuevas no coinciden.'); return }
-    const result = changePassword(pwdForm.current, pwdForm.newPass)
-    if (!result.success) { setPwdError(result.error ?? 'Error desconocido.'); return }
-    setPwdSuccess('✅ Contraseña actualizada correctamente.')
+    const result = await changePassword(pwdForm.newPass)
+    if (!result.success) { setPwdError(result.error ?? 'Error al actualizar contraseña.'); return }
+    setPwdSuccess('✅ Contraseña actualizada correctamente en Supabase.')
     setPwdForm({ current: '', newPass: '', confirm: '' })
-    setPasswordStatus(getPasswordStatus())
     setTimeout(() => { setShowChangePwd(false); setPwdSuccess('') }, 2000)
   }
 
-  function handleLogout() {
-    logout()
+  async function handleLogout() {
+    await logout()
     router.push('/')
     window.location.reload()
   }
@@ -273,24 +275,14 @@ export default function ConfiguracionPage() {
           <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#f0f0f0' }}>Seguridad</h2>
         </div>
 
-        {/* Alerta contraseña por defecto */}
-        {passwordStatus?.isDefault && (
-          <div style={{ marginBottom: '16px', padding: '12px 16px', borderRadius: '10px', backgroundColor: '#ffb5470d', border: '1px solid #ffb54722', display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <AlertTriangle size={15} style={{ color: '#ffb547', flexShrink: 0 }} />
-            <p style={{ margin: 0, fontSize: '13px', color: '#ffb547', fontWeight: 600 }}>
-              Estás usando la contraseña por defecto. Se recomienda cambiarla.
-            </p>
+        {/* Info usuario autenticado */}
+        <div style={{ marginBottom: '16px', padding: '14px 18px', borderRadius: '12px', backgroundColor: '#00cfff0d', border: '1px solid #00cfff22', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+          <div>
+            <span style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.08em', color: '#6b7280', display: 'block' }}>Usuario Administrador</span>
+            <span style={{ fontSize: '14px', fontWeight: 700, color: '#00cfff' }}>{userEmail || 'Administrador Supabase'}</span>
           </div>
-        )}
-
-        {/* Info sesión */}
-        {passwordStatus?.expiryDate && (
-          <div style={{ marginBottom: '16px', padding: '12px 16px', borderRadius: '10px', backgroundColor: '#00cfff0d', border: '1px solid #00cfff22' }}>
-            <p style={{ margin: 0, fontSize: '12px', color: '#00cfff' }}>
-              🔐 Sesión activa · Expira: {passwordStatus.expiryDate.toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' })}
-            </p>
-          </div>
-        )}
+          <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '999px', backgroundColor: '#00ff9415', color: '#00ff94', fontWeight: 700 }}>Supabase Auth</span>
+        </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           {/* Cambiar contraseña */}
@@ -301,7 +293,7 @@ export default function ConfiguracionPage() {
                 <KeyRound size={18} style={{ color: '#00cfff' }} />
                 <div>
                   <p style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: '#f0f0f0' }}>Cambiar contraseña</p>
-                  <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#6b7280' }}>Sesión se mantiene activa por 7 días</p>
+                  <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#6b7280' }}>Actualiza tu clave de acceso en Supabase</p>
                 </div>
               </div>
             </button>
@@ -309,7 +301,6 @@ export default function ConfiguracionPage() {
               <div style={{ padding: '20px', borderTop: '1px solid #1f1f1f', backgroundColor: '#0d0d0d' }}>
                 <form onSubmit={handleChangePassword} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   {[
-                    { key: 'current', label: 'Contraseña actual', placeholder: 'Tu contraseña actual' },
                     { key: 'newPass', label: 'Nueva contraseña', placeholder: 'Mínimo 6 caracteres' },
                     { key: 'confirm', label: 'Confirmar nueva contraseña', placeholder: 'Repite la nueva contraseña' },
                   ].map(({ key, label, placeholder }) => (
@@ -320,7 +311,7 @@ export default function ConfiguracionPage() {
                           onChange={e => setPwdForm(p => ({ ...p, [key]: e.target.value }))}
                           placeholder={placeholder}
                           style={{ width: '100%', padding: '10px 40px 10px 14px', borderRadius: '10px', fontSize: '13px', outline: 'none', backgroundColor: '#161616', border: '1px solid #2a2a2a', color: '#f0f0f0', boxSizing: 'border-box' }} />
-                        {key === 'current' && (
+                        {key === 'newPass' && (
                           <button type="button" onClick={() => setShowPwd(!showPwd)}
                             style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', display: 'flex', alignItems: 'center' }}>
                             {showPwd ? <EyeOff size={14} /> : <Eye size={14} />}
