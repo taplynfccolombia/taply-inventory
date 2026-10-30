@@ -136,3 +136,58 @@ $$;
 INSERT INTO public.inventory (item_name, quantity, cost_per_unit)
 VALUES ('Tarjeta Negra Matte Base', 0, 21200)
 ON CONFLICT (item_name) DO NOTHING;
+
+
+-- ====================================================================
+-- 11. POLÍTICAS DE SEGURIDAD A NIVEL DE FILA (ROW LEVEL SECURITY - RLS)
+-- ====================================================================
+
+-- Activar RLS en todas las tablas
+ALTER TABLE public.nfc_profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.clients ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.sales ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.inventory ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.inventory_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.cash_flow ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.tasks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.goals ENABLE ROW LEVEL SECURITY;
+
+-- 11.1 nfc_profiles: lectura pública para perfiles activos, control total para Admin autenticado
+DROP POLICY IF EXISTS "Perfiles públicos activos son visibles para todos" ON public.nfc_profiles;
+CREATE POLICY "Perfiles públicos activos son visibles para todos" ON public.nfc_profiles
+  FOR SELECT USING (is_active = true);
+
+DROP POLICY IF EXISTS "Admin tiene control total de nfc_profiles" ON public.nfc_profiles;
+CREATE POLICY "Admin tiene control total de nfc_profiles" ON public.nfc_profiles
+  FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+-- 11.2 Tablas privadas: acceso exclusivo para Admin autenticado
+DROP POLICY IF EXISTS "Admin control clients" ON public.clients;
+CREATE POLICY "Admin control clients" ON public.clients FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Admin control sales" ON public.sales;
+CREATE POLICY "Admin control sales" ON public.sales FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Admin control inventory" ON public.inventory;
+CREATE POLICY "Admin control inventory" ON public.inventory FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Admin control inventory_logs" ON public.inventory_logs;
+CREATE POLICY "Admin control inventory_logs" ON public.inventory_logs FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Admin control cash_flow" ON public.cash_flow;
+CREATE POLICY "Admin control cash_flow" ON public.cash_flow FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Admin control tasks" ON public.tasks;
+CREATE POLICY "Admin control tasks" ON public.tasks FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Admin control goals" ON public.goals;
+CREATE POLICY "Admin control goals" ON public.goals FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+-- 11.3 Storage: bucket 'nfc-avatars'
+DROP POLICY IF EXISTS "Avatares públicos visibles para todos" ON storage.objects;
+CREATE POLICY "Avatares públicos visibles para todos" ON storage.objects
+  FOR SELECT USING (bucket_id = 'nfc-avatars');
+
+DROP POLICY IF EXISTS "Admin puede subir y gestionar avatares" ON storage.objects;
+CREATE POLICY "Admin puede subir y gestionar avatares" ON storage.objects
+  FOR ALL TO authenticated USING (bucket_id = 'nfc-avatars') WITH CHECK (bucket_id = 'nfc-avatars');
